@@ -1,5 +1,5 @@
 {
-  "name": "@weaxs/openclaw-stock-analysis",
+  "name": "@leev313217559/openclaw-stock-analysis",
   "version": "0.1.4",
   "description": "OpenClaw plugin for stock analysis, screening, and strategy backtesting across A/HK/US/JP/KR/TW markets",
   "type": "module",

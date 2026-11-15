@@ -1,5 +1,5 @@
 {
-  "name": "@weaxs/stock-analysis-plugin",
+  "name": "@leev313217559/stock-analysis-plugin",
   "version": "0.1.4",
   "description": "Pi Agent extension for stock analysis, screening, and strategy backtesting across A/HK/US/JP/KR/TW markets",
   "type": "module",
@@ -79,12 +79,15 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/Weaxs/stock-analysis-plugin"
+    "url": "git+https://github.com/leev313217559/stock-analysis-plugin.git"
   },
   "license": "MIT",
   "devDependencies": {
     "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.1",
     "@deepseek-ai/dsh-skill": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-tool-executor-native": "0.2.2-rc.1",
     "@deepseek-ai/dsh-tools": "0.2.2-rc.1",
     "@types/node": "^24.19.2",
     "esbuild": "^0.28.2",
@@ -92,10 +95,7 @@
     "openai": "^7.47.0",
     "tsx": "^4.23.15",
     "typebox": "^1.4.3",
-    "typescript": "^5.5.0",
-    "@deepseek-ai/dsh-llm": "0.2.2-rc.1",
-    "@deepseek-ai/dsh-system-prompt": "0.2.2-rc.1",
-    "@deepseek-ai/dsh-tool-executor-native": "0.2.2-rc.1"
+    "typescript": "^5.5.0"
   },
   "overrides": {
     "zod": "4.6.7"

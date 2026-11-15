@@ -38,7 +38,7 @@ declare global {
 }
 
 window.__ModuleLoader__.load({
-  id: "@weaxs/dsh-stock-analysis",
+  id: "@leev313217559/dsh-stock-analysis",
   factory(require) {
     const React = require("react") as ReactLike;
     const h = React.createElement;

@@ -13,7 +13,7 @@ dsh --profile <你的profile>
 
 `dsh plugin add` 是 pnpm 的薄封装：安装后 dsh 会读取本包 `package.json` 里的 `dsh.bundle.patch`，把 `cordis.patch.yml` 作为一层叠加进 profile 组合。可用 `dsh --profile <你的profile> --dump-config` 验证 layer 已生效。
 
-同一份插件也以 `@weaxs/dsh-stock-analysis` 发布；装 scoped 版时，下文配置里的包名也换成 `@weaxs/dsh-stock-analysis`。
+同一份插件也以 `@leev313217559/dsh-stock-analysis` 发布；装 scoped 版时，下文配置里的包名也换成 `@leev313217559/dsh-stock-analysis`。
 
 从源码安装（本仓库根目录）：
 

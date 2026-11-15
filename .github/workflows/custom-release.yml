@@ -1,0 +1,98 @@
+name: custom-dsh-release
+
+on:
+  push:
+    tags: ["custom-v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号，如 0.2.11-custom.1"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  build:
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Resolve version
+        id: ver
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#custom-v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Sync manifests to custom version
+        run: bash scripts/sync-version.sh "v${{ steps.ver.outputs.version }}"
+
+      - name: Install deps (no venv in CI)
+        run: npm ci --ignore-scripts
+
+      - name: Build dsh bundle
+        run: npm run build:dsh
+
+      - name: Verify custom package identity
+        run: |
+          set -euo pipefail
+          PKG="$(node -p "require('./dsh/package.json').name")"
+          grep -q "name: \"$PKG\"" dsh/cordis.patch.yml
+          grep -q "id: \"$PKG\"" dsh/dist/client.js
+          grep -q "$PKG/research-role" dsh/research.patch.yml
+          echo "identity OK: $PKG"
+
+      - name: Stage payload into dsh/
+        run: |
+          set -euo pipefail
+          for d in tools skills schemas templates strategies scripts; do
+            [ -d "$d" ] || continue
+            rm -rf "dsh/$d"
+            cp -R "$d" "dsh/$d"
+          done
+          rm -f dsh/scripts/sync-version.sh
+          cp LICENSE dsh/LICENSE
+
+      - name: Pack and verify tarball
+        working-directory: dsh
+        run: |
+          set -euo pipefail
+          npm pack
+          TGZ="$(ls *.tgz)"
+          tar -tzf "$TGZ" > files.txt
+          for f in \
+            package/dist/index.js \
+            package/dist/client.js \
+            package/dist/web/index.html \
+            package/dist/research-role.js \
+            package/cordis.patch.yml \
+            package/scripts/setup-python.mjs \
+            package/scripts/venv-python.mjs \
+            package/tools/stock_data.py \
+            package/skills/stock-analysis/SKILL.md; do
+            grep -qx "$f" files.txt || { echo "::error::missing $f in $TGZ"; exit 1; }
+          done
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: custom-v${{ steps.ver.outputs.version }}
+          name: custom-v${{ steps.ver.outputs.version }}
+          files: dsh/*.tgz
+          generate_release_notes: true

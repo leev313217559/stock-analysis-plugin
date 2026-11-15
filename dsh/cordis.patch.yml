@@ -3,4 +3,4 @@
 # and must export the cordis function-plugin form (name/inject/apply).
 - insert:
     - id: stock-analysis
-      name: "@weaxs/dsh-stock-analysis"
+      name: "@leev313217559/dsh-stock-analysis"
