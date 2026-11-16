@@ -51,7 +51,7 @@ allowBuilds:
 
 ## 按需工具发现
 
-dsh 0.2.2 及以上（工具注册支持按步骤的 `when` 条件）默认增加一个宿主控制入口 `stock_tool_search`；更早的 0.2.1 不提供该接口，插件会自动关闭按需发现并全量暴露工具，功能不受影响。按需发现只控制工具加载，不改变 73 个分析工具的名称、参数和输出。原生函数调用模式下，高频核心工具（`get_quote`、`get_kline`、`get_market_indices`、`get_market_stats`、`get_technical_analysis`、`get_news`）常驻，其余工具首次请求只暴露 `stock_tool_search`；其他插件的工具照常保留。搜索支持中文描述、英文关键词或确切工具名，例如 `财务`、`get_quote`、`run_backtest`；命中工具在下一次模型请求提供完整 schema，再按原名调用。默认最多加载 5 项，`limit` 可设 1 到 20；无匹配返回空列表。
+dsh 0.2.2 及以上（工具注册支持按步骤的 `when` 条件）默认增加一个宿主控制入口 `stock_tool_search`；更早的 0.2.1 不提供该接口，插件会自动关闭按需发现并全量暴露工具，功能不受影响。按需发现只控制工具加载，不改变 73 个分析工具的名称、参数和输出。原生函数调用模式下，高频核心工具（`get_quote`、`get_kline`、`get_market_indices`、`get_market_stats`、`get_technical_analysis`、`get_news`）常驻，其余工具首次请求只暴露 `stock_tool_search`；其他插件的工具照常保留。搜索支持中文描述、英文关键词或确切工具名，例如 `财务`、`get_quote`、`run_backtest`；query 应把用户问题规范化为中文功能词，英文缩写/行话（PE、PB、ROE、MACD、13F、Form 4、ETF、PCF 等）保留英文，股票代码和工具名原样保留。命中工具在下一次模型请求提供完整 schema，再按原名调用。默认最多加载 5 项，`limit` 可设 1 到 20；无匹配返回空列表。
 
 加载集合按 Agent 隔离，搜索和回退均保留宿主已有的工具权限限制。搜索入口被禁止或移除时，下一次请求保留原先已授权的完整股票工具目录。旧版缺少相关接口时保持全量暴露；PTC / both 模式沿用宿主生成的 SDK，不做发现过滤。加载集合在本次运行中保留，恢复会话或重载插件后需重新搜索。
 

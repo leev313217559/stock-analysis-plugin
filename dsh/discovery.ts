@@ -40,7 +40,7 @@ export function createToolDiscovery(ctx: Context): (tool: {name: string; descrip
   };
   ctx.tools.register(defineTool({
     name: SEARCH,
-    description: "搜索并加载股票分析工具；支持中文、英文关键词或确切工具名，如财务、get_quote、run_backtest。核心工具（get_quote/get_kline/get_market_indices/get_market_stats/get_technical_analysis/get_news）已常驻；其余工具调用前必须先调用本工具加载，未加载直接调用会返回 unknown tool。可一次搜索多个工具名（limit 最多 20），加载后在下一次模型请求按原名调用。不会执行分析或扩大权限。",
+    description: "搜索并加载股票分析工具。query 规则：把用户问题规范化为中文功能词；英文缩写/行话（PE、PB、ROE、MACD、13F、Form 4、ETF、PCF 等）保留英文；股票代码和工具名原样保留，不要翻译。核心工具（get_quote/get_kline/get_market_indices/get_market_stats/get_technical_analysis/get_news）已常驻；其余工具调用前必须先调用本工具加载，未加载直接调用会返回 unknown tool。可一次搜索多个工具名（limit 最多 20），加载后在下一次模型请求按原名调用。不会执行分析或扩大权限。",
     parameters: {
       query: {type: "string", required: true, description: "工具名称或功能关键词"},
       limit: {type: "integer", description: "最多加载数量，默认5，范围1到20"},

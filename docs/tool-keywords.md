@@ -58,7 +58,7 @@
 | `get_signal_summary` | 信号汇总、胜率统计、信号统计、交易信号、signal summary、win rate |
 | `get_social_sentiment` | 情绪、舆情、股吧、雪球、Reddit、散户情绪、social sentiment、sentiment |
 | `get_stock_info` | 股票信息、公司简介、行业分类、上市日期、总股本、stock info、company profile |
-| `get_technical_analysis` | 技术分析、技术指标、MACD、RSI、KDJ、BOLL、买卖信号、支撑压力、technical analysis |
+| `get_technical_analysis` | 技术分析、技术指标、MACD、RSI、KDJ、BOLL、金叉、死叉、超买超卖、买卖信号、支撑压力、technical analysis |
 | `get_trading_days` | 交易日列表、未来交易日、交易日历、trading days、calendar |
 | `get_trading_phase` | 交易时段、盘前、盘中、盘后、午间休市、trading session、market phase |
 | `get_trending_sentiment` | 热门趋势、社交热度、热门股、trending、social buzz |

@@ -82,6 +82,9 @@ try {
     ["研报", "search_comprehensive_intel"],
     ["财报", "get_financials"],
     ["13F", "get_us_holdings"],
+    ["PE 估值", "get_valuation_history"],
+    ["MACD 金叉", "get_technical_analysis"],
+    ["Form 4 内部人", "get_insider_trades"],
   ] as const;
   for (const [query, tool] of keywordHits) {
     const hit = await search(second, query, 5);
