@@ -9,6 +9,7 @@ import * as NativeExecutor from "@deepseek-ai/dsh-tool-executor-native";
 import { ToolCallId } from "@deepseek-ai/dsh-llm";
 import * as stockPlugin from "../dsh/index.js";
 import { CORE_TOOLS } from "../dsh/discovery.js";
+import { TOOL_KEYWORDS } from "../dsh/tool-keywords.js";
 
 const ctx = new Context();
 await ctx.plugin(SystemPrompt);
@@ -76,6 +77,17 @@ try {
   const capabilities = await call(second, "get_market_capabilities", {market: "HK"});
   assert.equal(capabilities.isError, false);
   assert.equal(JSON.parse(String(capabilities.value)).market, "HK", "a discovered tool must execute the real Python CLI");
+  const keywordHits = [
+    ["资金流", "get_capital_flow"],
+    ["龙虎榜", "get_dragon_tiger"],
+    ["研报", "search_comprehensive_intel"],
+    ["财报", "get_financials"],
+    ["13F", "get_us_holdings"],
+  ] as const;
+  for (const [query, tool] of keywordHits) {
+    const hit = await search(second, query, 5);
+    assert(hit.loaded.some((item: {name: string}) => item.name === tool), `keyword ${query} should load ${tool}`);
+  }
   assert.deepEqual((await search(first, "nonexistent_zzzzz")).loaded, []);
   assert.equal(typeof (await search(first, "get_quote", 0)).error, "string");
 
@@ -109,5 +121,11 @@ try {
   assert.equal(eager.tools.schemas().length, 73);
   assert.equal(eager.tools.get("stock_tool_search"), undefined);
   assert.equal((await eager.systemPrompt.assemble({scope: {}})).tools.length, 73);
+  const eagerNames = eager.tools.schemas().map(tool => tool.name).sort();
+  assert.deepEqual(Object.keys(TOOL_KEYWORDS).sort(), eagerNames, "every registered tool needs one keyword entry");
+  for (const [name, keywords] of Object.entries(TOOL_KEYWORDS)) {
+    assert(keywords.length >= 3, `${name} needs at least 3 keywords`);
+    assert.equal(new Set(keywords).size, keywords.length, `${name} has duplicate keywords`);
+  }
 } finally { await eager.fiber.dispose(); }
 console.log("dsh discovery: scoped loading, Chinese search, permissions, fallback, and real Python round-trip passed");

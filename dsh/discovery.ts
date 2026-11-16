@@ -1,6 +1,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import { defineTool, type ToolRegistrationOptions } from "@deepseek-ai/dsh-tools";
 import type {} from "@deepseek-ai/dsh-system-prompt";
+import { keywordsFor } from "./tool-keywords.js";
 
 const SEARCH = "stock_tool_search";
 // High-frequency tools stay eager so a model mistake (searching the wrong name)
@@ -48,14 +49,24 @@ export function createToolDiscovery(ctx: Context): (tool: {name: string; descrip
       const agent = exec.agent;
       const candidates = [...names]
         .filter(([name]) => ctx.tools.get(name, agent))
-        .map(([name, description]) => ({tool: {name, description}, text: `${name} ${description}`.toLowerCase()}));
+        .map(([name, description]) => {
+          const keywords = keywordsFor(name);
+          const keywordText = keywords.join(" ").toLowerCase();
+          return {
+            tool: {name, description},
+            keywordText,
+            text: `${name} ${description} ${keywordText}`.toLowerCase(),
+          };
+        });
       // Generic stock terms should not outrank the specific capability being searched.
       const weights = terms.map(term => 1 / (1 + candidates.filter(({text}) => text.includes(term)).length));
       const matches = candidates
-        .map(({tool, text}) => {
-          const score = (tool.name === needle ? 1000 : 0) + (text.includes(needle) ? 10 : 0)
+        .map(({tool, keywordText, text}) => {
+          const score = (tool.name === needle ? 1000 : 0)
+            + (text.includes(needle) ? 10 : 0)
+            + (keywordText.includes(needle) ? 40 : 0)
             + terms.reduce((sum, term, index) => sum + weights[index]
-              * (tool.name.includes(term) ? 3 : text.includes(term) ? 1 : 0), 0);
+              * (tool.name.includes(term) ? 4 : keywordText.includes(term) ? 2.5 : text.includes(term) ? 1 : 0), 0);
           return {tool, score};
         })
         .filter(match => match.score > 0)
