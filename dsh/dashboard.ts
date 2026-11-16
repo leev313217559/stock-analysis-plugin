@@ -23,13 +23,13 @@ const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 
 // Fixed index lists: the browser can only name a region, never a symbol or command.
-const CN_INDEX_SYMBOLS = ["sh000001", "sz399001", "sz399006", "sh000688", "sh000300", "sh000016"];
+const CN_INDEX_SYMBOLS = ["sh000001", "sz399001", "sz399006"];
 export const INDEX_SYMBOLS: Record<Region, string[]> = {
   cn: CN_INDEX_SYMBOLS,
-  hk: ["^HSI", "^HSCE", "^HSTECH"],
-  us: ["^DJI", "^IXIC", "^GSPC", "^RUT"],
-  jp: ["^N225", "^TOPX"],
-  kr: ["^KS11", "^KQ11"],
+  hk: ["^HSI", "^HSTECH"],
+  us: ["^IXIC", "^GSPC", "^DJI"],
+  jp: ["^N225"],
+  kr: ["^KS11"],
   tw: ["^TWII"],
 };
 const RIBBON: Array<[Region, string]> = [
@@ -346,7 +346,7 @@ function safeError(value: unknown, fallback: string): string {
   return typeof value === "string" && value && value.length <= 160 && !/[/\\\n]/.test(value) ? value : fallback;
 }
 
-type Kind = "phase" | "quote" | "indices" | "trend" | "sectors" | "stats";
+type Kind = "phase" | "quote" | "indices" | "trend" | "chart" | "sectors" | "stats";
 interface Slot {
   value: unknown;
   error: string | null;
@@ -448,6 +448,7 @@ export function createDashboardHandler(options: DashboardOptions): DashboardHand
       case "quote":
       case "indices": return open ? (watched ? 30 * SECOND : 5 * MINUTE) : 30 * MINUTE;
       case "trend": return open ? 10 * MINUTE : 60 * MINUTE;
+      case "chart": return open ? (region === "cn" || region === "hk" ? MINUTE : 3 * MINUTE) : 30 * MINUTE;
       case "sectors": return open ? (watched ? MINUTE : 5 * MINUTE) : 30 * MINUTE;
       case "stats": return open ? (watched ? 2 * MINUTE : 10 * MINUTE) : 60 * MINUTE;
     }
@@ -472,6 +473,21 @@ export function createDashboardHandler(options: DashboardOptions): DashboardHand
       key: `trend:${symbol}`, kind: "trend", region, priority,
       // Yahoo-backed regions regularly need 20-30 s from mainland networks.
       run: async () => trendRows(await py("stock_data.py", ["kline", symbol, "--period", "daily", "--count", "30"], region === "cn" ? 20_000 : 40_000)),
+    };
+  }
+
+  function chartJob(symbol: string, region: Region, priority: number): Job {
+    return {
+      key: `chart:${symbol}`, kind: "chart", region, priority,
+      run: async () => {
+        const value = await py("index_chart.py", [symbol, "--days", "120"], region === "cn" ? 35_000 : 60_000);
+        if (!value || typeof value !== "object" || Array.isArray(value) || (value as {error?: unknown}).error) {
+          throw new Error(safeError((value as {error?: unknown})?.error, "指数图表暂不可用"));
+        }
+        const chart = value as {history?: unknown; intraday?: unknown};
+        if (!Array.isArray(chart.history) || !chart.intraday) throw new Error("指数图表格式不正确");
+        return value;
+      },
     };
   }
 
@@ -505,10 +521,8 @@ export function createDashboardHandler(options: DashboardOptions): DashboardHand
     }
     for (const symbol of symbols) list.push(trendJob(symbol, symbolRegion(symbol), 3));
     for (const region of REGIONS) {
-      for (const code of INDEX_SYMBOLS[region]) {
-        const ribbon = RIBBON.some(([, item]) => item === code);
-        list.push(trendJob(code, region, ribbon || region === viewedRegion ? 3 : 4));
-      }
+      const priority = region === viewedRegion ? 2 : 3;
+      for (const code of INDEX_SYMBOLS[region]) list.push(chartJob(code, region, priority));
     }
     list.push({
       key: "sectors", kind: "sectors", region: "cn", priority: 4,
@@ -602,14 +616,14 @@ export function createDashboardHandler(options: DashboardOptions): DashboardHand
   }
 
   function indexRow(region: Region, code: string) {
-    const trend = slotView(`trend:${code}`);
+    const chart = slotView(`chart:${code}`);
     if (region === "cn") {
       const quote = slotView(`quote:${code}`);
-      return { region, code, quote: quote.value, error: quote.error, loading: quote.loading, updatedAt: quote.updatedAt, trend: trend.value };
+      return { region, code, quote: quote.value, error: quote.error, loading: quote.loading, updatedAt: quote.updatedAt, chart: chart.value, chartError: chart.error, chartLoading: chart.loading };
     }
     const indices = slotView(`indices:${region}`);
     const quote = Array.isArray(indices.value) ? indices.value.find((row: { code?: string }) => row?.code === code) ?? null : null;
-    return { region, code, quote, error: indices.error, loading: indices.loading, updatedAt: indices.updatedAt, trend: trend.value };
+    return { region, code, quote, error: indices.error, loading: indices.loading, updatedAt: indices.updatedAt, chart: chart.value, chartError: chart.error, chartLoading: chart.loading };
   }
 
   function snapshot(region: Region) {

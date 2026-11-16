@@ -26,6 +26,45 @@ interface TrendRow {
   close: Numeric;
 }
 
+interface ChartBar {
+  date: string;
+  open?: Numeric;
+  high?: Numeric;
+  low?: Numeric;
+  close: Numeric;
+  volume?: Numeric;
+  turnover?: Numeric;
+}
+
+interface IntradayPoint {
+  t: string;
+  price: Numeric;
+}
+
+interface Intraday {
+  date?: string;
+  points?: IntradayPoint[];
+  prev_close?: Numeric;
+  volume?: Numeric;
+  turnover?: Numeric;
+  source?: string;
+  delayed?: boolean;
+}
+
+interface IndexChart {
+  symbol?: string;
+  market?: string;
+  currency?: string;
+  volume_unit?: string;
+  turnover_unit?: string;
+  source?: string;
+  delayed?: boolean;
+  as_of?: string;
+  prev_close?: Numeric;
+  intraday?: Intraday;
+  history?: ChartBar[];
+}
+
 interface Phase {
   phase?: string;
   phase_label?: string;
@@ -58,7 +97,9 @@ interface IndexRow {
   error: string | null;
   loading: boolean;
   updatedAt?: string | null;
-  trend: TrendRow[] | null;
+  chart: IndexChart | null;
+  chartError?: string | null;
+  chartLoading?: boolean;
 }
 
 interface Stats {
@@ -448,8 +489,9 @@ function renderRibbon() {
         tile.append(el("span", "tile-price flat", "—"));
         tile.title = row.error || "该指数暂时没有报价";
       }
-      const chart = spark(row.trend, 114, 22);
+      const chart = intradaySpark(row.chart?.intraday, 114, 22);
       if (chart) tile.append(chart);
+      if (row.chart?.delayed) tile.append(el("span", "delay-badge", "延迟"));
       tiles.append(tile);
     }
     group.append(head, tiles);
@@ -484,38 +526,6 @@ function breadthBar(up: number, flat: number, down: number): HTMLSpanElement {
 
 function statsCounts(stats: Stats): [number, number, number] {
   return [num(stats.up_count) ?? 0, num(stats.flat_count) ?? 0, num(stats.down_count) ?? 0];
-}
-
-function renderPulse() {
-  const node = $("pulse");
-  node.replaceChildren();
-  const slot = state.snap?.stats;
-  const stats = slot?.value;
-  node.append(el("span", "label", "A股"));
-  if (!slot || !stats) {
-    node.append(el("span", "", slot?.error && !slot.loading ? "全市场涨跌统计暂时失败，稍后自动重试" : "正在统计全市场涨跌，首次约需 15–60 秒…"));
-    return;
-  }
-  const [up, flat, down] = statsCounts(stats);
-  const breadth = el("span", "breadth");
-  const upText = el("span", "up", "涨 ");
-  upText.append(el("strong", "up", up));
-  const downText = el("span", "down", "跌 ");
-  downText.append(el("strong", "down", down));
-  breadth.append(upText, breadthBar(up, flat, down), downText);
-  const item = (label: string, value: string | number, cls = "") => {
-    const span = el("span", "", `${label} `);
-    span.append(el("strong", cls, value));
-    return span;
-  };
-  node.append(
-    breadth,
-    item("涨停", num(stats.limit_up_count) ?? "—", "up"),
-    item("跌停", num(stats.limit_down_count) ?? "—", "down"),
-    item("中位数", fmtPct(stats.median_change_pct), dir(stats.median_change_pct)),
-    item("成交额", fmtAmount(stats.total_turnover)),
-  );
-  if (slot.updatedAt) node.append(el("span", "", `统计于 ${clock(slot.updatedAt)}`));
 }
 
 function renderFilters() {
@@ -716,39 +726,211 @@ function phaseNote(phase: Phase | null | undefined): string {
   return [phase.phase_label, phase.local_time && `当地 ${phase.local_time.slice(11, 16)}`].filter(Boolean).join(" · ");
 }
 
-function indexPanel(market: Snapshot["market"], phase: Phase | null | undefined): HTMLDivElement {
-  const node = panel("指数", phaseNote(phase));
-  const table = el("table", "idx");
-  const body = el("tbody");
-  for (const row of market.indices) {
-    const tr = el("tr");
-    const name = el("td");
-    name.append(el("span", "iname", INDEX_NAMES[row.code] || row.quote?.name || row.code), el("span", "icode", row.code));
-    const price = el("td", `iprice ${dir(row.quote?.change_pct)}`);
-    const pct = el("td", `ipct ${dir(row.quote?.change_pct)}`);
-    if (row.quote && num(row.quote.price) !== null) {
-      price.textContent = fmtPrice(row.quote.price, 2);
-      pct.textContent = `${fmtSigned(row.quote.change, 2)}  ${fmtPct(row.quote.change_pct)}`;
-      if (isStale(row)) {
-        tr.classList.add("is-stale");
-        tr.title = staleTitle(row);
-      }
-    } else if (row.loading) {
-      price.append(skeleton(64));
-      pct.append(skeleton(80));
-    } else {
-      price.textContent = "—";
-      pct.textContent = row.error || "暂不可用";
-      pct.className = "ipct flat";
-    }
-    const chartCell = el("td", "ispark");
-    const chart = spark(row.trend, 110, 26);
-    if (chart) chartCell.append(chart);
-    tr.append(name, price, pct, chartCell);
-    body.append(tr);
+function intradaySpark(intraday: Intraday | null | undefined, width = 114, height = 24): SVGSVGElement | null {
+  const points = (intraday?.points ?? [])
+    .map(point => ({t: point.t, price: num(point.price)}))
+    .filter((point): point is {t: string; price: number} => point.price !== null && point.price > 0);
+  if (points.length < 2) return null;
+  const prices = points.map(point => point.price);
+  const prev = num(intraday?.prev_close);
+  const first = prev ?? prices[0];
+  const last = prices[prices.length - 1];
+  const min = Math.min(...prices, first);
+  const max = Math.max(...prices, first);
+  const range = max - min || 1;
+  const pad = 2;
+  const xs = points.map((_, index) => pad + index / (points.length - 1) * (width - pad * 2));
+  const ys = prices.map(price => pad + (max - price) / range * (height - pad * 2));
+  const path = xs.map((x, index) => `${index ? "L" : "M"}${x.toFixed(1)},${ys[index].toFixed(1)}`).join("");
+  const svg = svgEl("svg", {class: `spark ${dir(last - first)}`, width, height, viewBox: `0 0 ${width} ${height}`, role: "img"});
+  svg.setAttribute("aria-label", `当日分时走势，最新 ${fmtPrice(last, 2)}`);
+  if (prev !== null) {
+    const baseY = pad + (max - prev) / range * (height - pad * 2);
+    svg.append(svgEl("line", {class: "base", x1: pad, x2: width - pad, y1: baseY, y2: baseY}));
   }
-  table.append(body);
-  node.append(table);
+  svg.append(svgEl("path", {class: "line", d: path}));
+  return svg;
+}
+
+function movingAverage(values: Array<number | null>, period: number): Array<number | null> {
+  return values.map((value, index) => {
+    if (value === null) return null;
+    const window = values.slice(Math.max(0, index - period + 1), index + 1);
+    if (window.length < period || window.some(item => item === null)) return null;
+    return window.reduce<number>((sum, item) => sum + (item ?? 0), 0) / period;
+  });
+}
+
+function barChange(bar: {close?: Numeric}, previous?: {close?: Numeric}): number | null {
+  const close = num(bar.close);
+  const prev = num(previous?.close);
+  return close !== null && prev !== null && prev > 0 ? (close / prev - 1) * 100 : null;
+}
+
+function indexChartSvg(chart: IndexChart): SVGSVGElement | null {
+  const bars: Array<{date: string; close: number; open: number | null; high: number | null; low: number | null; volume: number | null; turnover: number | null}> = [];
+  for (const bar of chart.history ?? []) {
+    const close = num(bar.close);
+    if (close === null || close <= 0) continue;
+    bars.push({date: bar.date, close, open: num(bar.open), high: num(bar.high), low: num(bar.low), volume: num(bar.volume), turnover: num(bar.turnover)});
+  }
+  if (bars.length < 2) return null;
+  const W = 1000, H = 300, pad = 10, priceBottom = 214, volTop = 228, volBottom = 288;
+  const closes = bars.map(bar => bar.close);
+  const ma5 = movingAverage(closes, 5);
+  const ma20 = movingAverage(closes, 20);
+  const ma60 = movingAverage(closes, 60);
+  const allValues = [...closes, ...ma5, ...ma20, ...ma60].filter((value): value is number => value !== null);
+  const min = Math.min(...allValues);
+  const max = Math.max(...allValues);
+  const range = max - min || 1;
+  const x = (index: number) => pad + index / (bars.length - 1) * (W - pad * 2);
+  const y = (value: number) => pad + (max - value) / range * (priceBottom - pad);
+  const path = (values: Array<number | null>) => {
+    let started = false;
+    return values.map((value, index) => {
+      if (value === null) {
+        started = false;
+        return "";
+      }
+      const command = started ? "L" : "M";
+      started = true;
+      return `${command}${x(index).toFixed(1)},${y(value).toFixed(1)}`;
+    }).join("");
+  };
+  const maxVolume = Math.max(...bars.map(bar => bar.volume ?? 0), 1);
+  const slotWidth = (W - pad * 2) / bars.length;
+  const barWidth = Math.max(1, slotWidth * 0.64);
+  const svg = svgEl("svg", {
+    class: "chart-svg", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", role: "img",
+  });
+  svg.setAttribute("aria-label", `${chart.symbol || ""} 近 ${bars.length} 个交易日走势与成交量`);
+  for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
+    const gy = pad + fraction * (priceBottom - pad);
+    svg.append(svgEl("line", {class: "grid", x1: pad, x2: W - pad, y1: gy, y2: gy}));
+  }
+  bars.forEach((bar, index) => {
+    const volume = bar.volume ?? 0;
+    const height = volume / maxVolume * (volBottom - volTop);
+    const up = bar.open === null || bar.close >= bar.open;
+    svg.append(svgEl("rect", {
+      class: `vol ${up ? "up" : "down"}`,
+      x: x(index) - barWidth / 2, y: volBottom - height, width: barWidth, height,
+    }));
+  });
+  svg.append(
+    svgEl("path", {class: "ma ma60", d: path(ma60)}),
+    svgEl("path", {class: "ma ma20", d: path(ma20)}),
+    svgEl("path", {class: "ma ma5", d: path(ma5)}),
+    svgEl("path", {class: "line", d: path(closes)}),
+    svgEl("circle", {class: "end", cx: x(bars.length - 1), cy: y(closes[closes.length - 1]), r: 3}),
+  );
+  bars.forEach((bar, index) => {
+    const change = barChange(bar, bars[index - 1]);
+    const title = [
+      bar.date,
+      `开 ${fmtPrice(bar.open, 2)}`,
+      `高 ${fmtPrice(bar.high, 2)}`,
+      `低 ${fmtPrice(bar.low, 2)}`,
+      `收 ${fmtPrice(bar.close, 2)}`,
+      `涨跌 ${fmtPct(change)}`,
+      `成交量 ${fmtAmount(bar.volume)} ${chart.volume_unit ?? ""}`.trim(),
+      bar.turnover !== null ? `成交额 ${fmtAmount(bar.turnover)} ${chart.turnover_unit ?? ""}`.trim() : "",
+    ].filter(Boolean).join(" · ");
+    const hit = svgEl("rect", {
+      class: "hit", x: x(index) - slotWidth / 2, y: 0, width: Math.max(slotWidth, 2), height: H,
+      fill: "transparent",
+    });
+    const node = svgEl("title");
+    node.textContent = title;
+    hit.append(node);
+    svg.append(hit);
+  });
+  return svg;
+}
+
+function indexMetric(label: string, value: string | number, cls = ""): HTMLSpanElement {
+  const node = el("span", "", `${label} `);
+  node.append(el("strong", cls, value));
+  return node;
+}
+
+function indexChartCard(row: IndexRow): HTMLElement {
+  const chart = row.chart;
+  const bars = chart?.history ?? [];
+  const last = bars.length ? bars[bars.length - 1] : undefined;
+  const previous = bars.length > 1 ? bars[bars.length - 2] : undefined;
+  const quote = row.quote;
+  // Latest quote amount is authoritative when the provider's daily history omits it.
+  if (last && last.turnover === null && chart?.intraday?.date === last.date) {
+    const quoteTurnover = num(quote?.turnover);
+    if (quoteTurnover !== null && quoteTurnover > 0) last.turnover = quoteTurnover;
+  }
+  const price = num(quote?.price) ?? num(last?.close);
+  const changePct = num(quote?.change_pct) ?? barChange(last ?? {date: "", close: null}, previous);
+  const card = el("article", "chart-card");
+  const head = el("div", "chart-head");
+  const title = el("div", "chart-title");
+  title.append(el("strong", "", INDEX_NAMES[row.code] || quote?.name || row.code), el("span", "chart-code", row.code));
+  head.append(title);
+  if (chart?.delayed) head.append(el("span", "delay-badge", "延迟"));
+  const change = el("div", `chart-change ${dir(changePct)}`);
+  change.append(el("strong", "", fmtPrice(price, 2)), el("span", "", fmtPct(changePct)));
+  head.append(change);
+  card.append(head);
+
+  const range = bars.length ? `${shortDate(bars[0].date)} – ${shortDate(bars[bars.length - 1].date)}` : "";
+  const sub = [chart?.as_of ? `数据截至 ${chart.as_of}` : "", range ? `区间 ${range}` : "", chart?.delayed ? "供应商延迟" : ""].filter(Boolean).join(" · ");
+  if (sub) card.append(el("p", "chart-sub", sub));
+  if (chart) {
+    const quoteTurnover = num(quote?.turnover);
+    const turnover = num(last?.turnover) ?? (quoteTurnover !== null && quoteTurnover > 0 ? quoteTurnover : null);
+    const volumeUnit = chart.volume_unit || "";
+    const turnoverUnit = chart.turnover_unit || "";
+    const metrics = el("div", "chart-metrics");
+    metrics.append(
+      indexMetric("开", fmtPrice(last?.open, 2)),
+      indexMetric("高", fmtPrice(last?.high, 2)),
+      indexMetric("低", fmtPrice(last?.low, 2)),
+      indexMetric("昨收", fmtPrice(chart.prev_close, 2)),
+      indexMetric("成交量", `${fmtAmount(last?.volume)} ${volumeUnit}`.trim()),
+      indexMetric("成交额", turnover !== null ? `${fmtAmount(turnover)} ${turnoverUnit}`.trim() : "—"),
+    );
+    card.append(metrics);
+  }
+
+  const wrap = el("div", "chart-svg-wrap");
+  if (chart) {
+    const svg = indexChartSvg(chart);
+    if (svg) wrap.append(svg);
+    else wrap.append(el("p", "panel-note", row.chartError || "暂无足够的历史数据"));
+  } else if (row.chartLoading) {
+    wrap.append(skeleton(760));
+  } else {
+    wrap.append(el("p", "panel-note", row.chartError || "指数图表暂不可用"));
+  }
+  card.append(wrap);
+
+  if (chart) {
+    const legend = el("div", "chart-legend");
+    legend.append(
+      el("span", "legend-line close", "收盘"),
+      el("span", "legend-line ma5", "MA5"),
+      el("span", "legend-line ma20", "MA20"),
+      el("span", "legend-line ma60", "MA60"),
+      el("span", "legend-vol", `成交量（${chart.volume_unit || "股"}）`),
+    );
+    if (chart.turnover_unit) legend.append(el("span", "legend-vol", `成交额（${chart.turnover_unit}，有则显示）`));
+    card.append(legend);
+  }
+  return card;
+}
+
+function indexCharts(market: Snapshot["market"], phase: Phase | null | undefined): HTMLDivElement {
+  const node = panel("指数走势", phaseNote(phase));
+  const list = el("div", "chart-list");
+  for (const row of market.indices) list.append(indexChartCard(row));
+  node.append(list);
   return node;
 }
 
@@ -845,11 +1027,13 @@ function renderMarket() {
     return;
   }
   const phase = snap.phases?.[state.region];
-  body.append(indexPanel(market, phase));
-  const side = el("div", "side");
-  if (state.region === "cn") side.append(statsPanel(snap.stats), sectorsPanel(snap.sectors));
-  else side.append(sessionPanel(state.region, phase));
-  body.append(side);
+  body.append(indexCharts(market, phase));
+  if (state.region === "cn") {
+    body.append(statsPanel(snap.stats));
+    body.append(sectorsPanel(snap.sectors));
+  } else {
+    body.append(sessionPanel(state.region, phase));
+  }
 }
 
 function render(flash = new Map<string, Direction>()) {
@@ -858,7 +1042,6 @@ function render(flash = new Map<string, Direction>()) {
   $("watch-count").textContent = state.snap ? `${state.snap.watchlist.length} / 30` : "";
   renderStatus();
   renderRibbon();
-  renderPulse();
   renderFilters();
   renderRows(flash);
   renderMarket();

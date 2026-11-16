@@ -92,6 +92,16 @@ function fakePython(options: { phase?: string; fail?: (script: string, args: str
     active--;
     if (options.fail?.(script, args)) throw new Error("secret stderr\n  at /private/provider.py");
     if (script === "trading_calendar.py") return JSON.stringify({ market: args[1], phase: options.phase ?? "post_market", phase_label: "盘后" });
+    if (script === "index_chart.py") return JSON.stringify({
+      symbol: args[0], market: "A", currency: "CNY", volume_unit: "手", turnover_unit: "元",
+      source: "tencent", delayed: false, as_of: "2026-01-03 15:00", prev_close: 99,
+      intraday: { date: "2026-01-03", points: [{ t: "09:30", price: 100 }, { t: "09:31", price: 101 }], prev_close: 99, source: "tencent", delayed: false, volume: 123 },
+      history: [
+        { date: "2026-01-01", open: 98, high: 101, low: 97, close: 100, volume: 1, turnover: 1000 },
+        { date: "2026-01-02", open: 100, high: 102, low: 99, close: 101, volume: 2, turnover: 2000 },
+        { date: "2026-01-03", open: 101, high: 102, low: 99, close: 101, volume: 3, turnover: 3000 },
+      ],
+    });
     if (args[0] === "quote") return JSON.stringify({ symbol: args[1], name: `Name ${args[1]}`, price: 100, change_pct: 1.2, high: 101, low: 99 });
     if (args[0] === "market_indices") return JSON.stringify([{ code: "^HSI", name: "恒生指数", price: 20000, change_pct: -0.5 }]);
     if (args[0] === "kline") return JSON.stringify([{ date: "2026-01-01", close: 10, open: 9 }, { date: "2026-01-02", close: 11 }, { date: "2026-01-03", close: "bad" }]);
@@ -266,7 +276,7 @@ try {
       "stock_data.py:quote sh000001",
       "stock_data.py:market_indices --region hk",
       "stock_data.py:kline 600519 --period daily --count 30",
-      "stock_data.py:kline ^HSI --period daily --count 30",
+      "index_chart.py:^HSI --days 120",
       "stock_data.py:sector_rankings --top 5 --direction both --board-type industry",
       "stock_data.py:market_stats",
       "trading_calendar.py:phase JP",
@@ -284,9 +294,12 @@ try {
     assert.equal(snap.watchlist[0].quote.symbol, "600519", "quotes keep the saved watchlist code");
     assert.deepEqual(snap.watchlist[0].trend, [{ date: "2026-01-01", close: 10 }, { date: "2026-01-02", close: 11 }], "trends are compact and drop invalid rows");
     assert.equal(snap.market.region, "hk");
-    assert.deepEqual(snap.market.indices.map((row: { code: string }) => row.code), ["^HSI", "^HSCE", "^HSTECH"]);
+    assert.deepEqual(snap.market.indices.map((row: { code: string }) => row.code), ["^HSI", "^HSTECH"]);
     assert.equal(snap.market.indices[0].quote.price, 20000);
     assert.equal(snap.market.indices[1].quote, null, "missing provider rows stay empty rather than invented");
+    assert.equal(snap.market.indices.length, 2, "only the top indices are charted");
+    assert.equal(snap.market.indices[0].chart.history.length, 3);
+    assert.equal(snap.market.indices[0].chart.intraday.points.length, 2, "today's intraday series is included");
     assert.equal(snap.ribbon[0].code, "sh000001");
     assert.equal(snap.ribbon[0].quote.price, 100);
     assert.equal(snap.stats.value.up_count, 2);
@@ -436,7 +449,7 @@ try {
     await indexDashboard.tick();
     await indexDashboard.settle();
     assert.equal(indexPy.calls.filter(key => key === "stock_data.py:quote sh000001").length, 1);
-    assert.equal(indexPy.calls.filter(key => key.startsWith("stock_data.py:kline sh000001 ")).length, 1);
+    assert.equal(indexPy.calls.filter(key => key === "index_chart.py:sh000001 --days 120").length, 1);
     await indexDashboard.dispose();
 
     const crossFile = join(temp, "cross-process", "watchlist.json");
@@ -492,6 +505,7 @@ try {
     assert.match(page.headers()["content-type"] as string, /text\/html/);
     assert.match(page.body(), /<script src="\.\/app\.js"/, "the page loads the compiled bundle");
     assert.match(page.body(), /id="settings"/, "the page exposes the settings button");
+    assert.doesNotMatch(page.body(), /id="pulse"/, "the old text breadth line is gone");
     assert.match(page.body(), /id="settings-modal"/, "the page exposes the settings editor");
     assert.match((await call(handler, get("/stock-analysis/app.js"))).headers()["content-type"] as string, /javascript/);
     for (const asset of ["app.js", "style.css"]) assert.equal((await call(handler, get(`/stock-analysis/${asset}`))).status(), 200);
@@ -499,6 +513,7 @@ try {
     const appSource = readFileSync(join(sourceWeb, "app.ts"), "utf8");
     assert(appSource.includes("./api/snapshot"), "the page reads one memory snapshot");
     assert(appSource.includes("api/config"), "the settings editor reads/writes the config file");
+    assert(appSource.includes("chart-list") && appSource.includes("indexChartSvg"), "the page renders per-index charts");
     assert(!/api\/(?:market|index-trend|watchlist\/quote)/.test(appSource), "the page does not call retired per-symbol routes");
   }
   await handler.settle();
