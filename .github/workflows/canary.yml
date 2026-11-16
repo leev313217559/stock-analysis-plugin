@@ -63,6 +63,7 @@ jobs:
 
       - name: Open or update canary issue
         if: steps.eval.outputs.failed != '0'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -105,6 +106,12 @@ jobs:
           for NUM in $NUMBERS; do
             gh issue close "$NUM" --comment "canary 已恢复：${GITHUB_RUN_ID}"
           done
+
+      - name: Fail when hard checks failed
+        if: steps.eval.outputs.failed != '0'
+        run: |
+          echo "::error::canary found hard data-source failures; see the step summary and canary-report artifact"
+          exit 1
 
       - name: Upload report
         if: always()
