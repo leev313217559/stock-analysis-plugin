@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
 import SkillRegistry from "@deepseek-ai/dsh-skill";
@@ -93,6 +94,13 @@ try {
   const filingAlias = await search(second, "财报", 5);
   assert(filingAlias.loaded.some((item: {name: string}) => item.name === "get_financials"));
   assert(filingAlias.loaded.some((item: {name: string}) => item.name === "get_earnings_calendar"), "shared alias loads both tools");
+  const recallCases = JSON.parse(readFileSync(new URL("./fixtures/tool-search-cases.json", import.meta.url), "utf8"));
+  for (const {query, expect: expected} of recallCases) {
+    const hit = await search(second, query, 8);
+    for (const tool of expected) {
+      assert(hit.loaded.some((item: {name: string}) => item.name === tool), `recall ${query} should load ${tool}`);
+    }
+  }
   assert.deepEqual((await search(first, "nonexistent_zzzzz")).loaded, []);
   assert.equal(typeof (await search(first, "get_quote", 0)).error, "string");
 

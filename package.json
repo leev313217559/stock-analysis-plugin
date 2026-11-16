@@ -53,7 +53,9 @@
   "scripts": {
     "postinstall": "node scripts/setup-python.mjs",
     "build:openclaw": "esbuild openclaw/index.ts --bundle --format=esm --platform=node --external:openclaw/* --outfile=openclaw/dist/index.js",
-    "build:dsh": "esbuild dsh/index.ts dsh/research-role.ts --bundle --format=esm --platform=node --external:@deepseek-ai/* --outdir=dsh/dist && esbuild dsh/client.ts dsh/web/app.ts dsh/web/index.html dsh/web/style.css --bundle --format=iife --platform=browser --target=es2020 --outbase=dsh --outdir=dsh/dist --loader:.html=copy --loader:.css=copy"
+    "build:dsh": "esbuild dsh/index.ts dsh/research-role.ts --bundle --format=esm --platform=node --external:@deepseek-ai/* --outdir=dsh/dist && esbuild dsh/client.ts dsh/web/app.ts dsh/web/index.html dsh/web/style.css --bundle --format=iife --platform=browser --target=es2020 --outbase=dsh --outdir=dsh/dist --loader:.html=copy --loader:.css=copy",
+    "audit:keywords": "node scripts/audit-tool-keywords.mjs --check",
+    "export:keywords": "node scripts/export-tool-keywords.mjs"
   },
   "keywords": [
     "pi-agent",

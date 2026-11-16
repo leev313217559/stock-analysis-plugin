@@ -85,3 +85,6 @@ pyTool({
 - 关键词跟着工具定义走，不单独维护映射表；新增工具时在同一个 block 里补关键词即可
 - 搜索测试覆盖 `资金流`、`龙虎榜`、`研报`、`财报`、`13F` 等典型词
 - 审阅用生成清单：`docs/tool-keywords.md`（运行 `node scripts/export-tool-keywords.mjs` 刷新，勿手改）
+- 覆盖标准：每个工具至少 8 个关键词，高频工具至少 12 个；`npm run audit:keywords` 检查
+- 召回集：`tests/fixtures/tool-search-cases.json`，`test_dsh_discovery.ts` 逐条断言目标工具被加载
+- 刷新清单：`npm run export:keywords`；审计：`npm run audit:keywords`
