@@ -30,7 +30,7 @@ commands can switch per process. Unknown values fall back to `lean`.
 | `sector_constituents` | eastmoney_industry, eastmoney_concept, sina |
 | `fund_flow` | eastmoney, efinance |
 | `dragon_tiger` | eastmoney, sina |
-| `hot_stocks` | eastmoney |
+| `hot_stocks` | eastmoney, baidu |
 | `margin_kline` | akshare, efinance |
 | `yf_quote_hk` / `yf_kline_hk` | tencent, yfinance |
 | `yf_quote_us` / `yf_kline_us` | tencent, yfinance |

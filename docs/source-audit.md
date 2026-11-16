@@ -20,7 +20,7 @@ removals), **Phase 3 done** (contract fixtures). Production defaults to
 | # | Item | Current role | Refs | Lean today | Recommendation | Why / risk |
 |---|---|---|---|---|---|---|
 | 1 | **baostock** | A-share kline backstop | 18 files | excluded | **remove** | legacy leg, extra dependency, rarely wins; K-line stays tencent + sina + akshare |
-| 2 | **baidu hot list** | hot-stocks backstop | 2 files | excluded | **decide** | keeping it restores a second keyless leg; dropping it makes `hot_stocks` fail whenever eastmoney throttles (observed locally) |
+| 2 | **baidu hot list** | hot-stocks backstop | 2 files | kept | **decide** | keeping it restores a second keyless leg; dropping it makes `hot_stocks` fail whenever eastmoney throttles (observed locally) |
 | 3 | **TIAA / youzhiyouxing** | US advisory-portfolio metadata and disclosures | 15 files | active (niche) | **remove** | very narrow audience, extra parse paths; removal touches quote path + tests |
 | 4 | **adanos sentiment** | HK/US social sentiment | 6 files | active if key | **remove** | unstable third-party, non-core; A-share guba/xueqiu stay |
 | 5 | **search engines** | news/sentiment search | 6–9 each | all clients kept | **keep 1–2** | no engine configured today → news search returns empty; recommend one hosted key (Tavily) plus self-hosted SearXNG optional |
