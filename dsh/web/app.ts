@@ -13,6 +13,7 @@ interface Quote {
   change_pct?: Numeric;
   high?: Numeric;
   low?: Numeric;
+  open?: Numeric;
   prev_close?: Numeric;
   volume?: Numeric;
   turnover?: Numeric;
