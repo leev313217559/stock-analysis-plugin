@@ -3,7 +3,7 @@
 
 Review archive: `render_market_report --save` appends the report object to a
 JSONL store so `history` can answer longitudinal questions. Store path:
-$STOCK_REVIEW_STORE, else ~/.stock-analysis/reviews.jsonl (pathlib.Path.home(),
+$STOCK_REVIEW_STORE, else $DSH_HOME/stock-analysis/reviews.jsonl (fallback ~/.dsh,
 cross-platform). `history` accepts --store PATH to override (tests point it at
 tmp_path).
 """
@@ -18,6 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from _paths import data_dir
 from _subproc import command_timeout, error_message, utf8_stdio
 from _subproc import run_tool as _run_tool
 from signal_tracker import _append_record, _load_records, _store_lock
@@ -158,7 +159,7 @@ def review_all() -> list:
 
 def _default_store() -> Path:
     env = os.environ.get("STOCK_REVIEW_STORE")
-    return Path(env) if env else Path.home() / ".stock-analysis" / "reviews.jsonl"
+    return Path(env) if env else data_dir() / "reviews.jsonl"
 
 
 def save_review(report: dict, store: Path | None = None) -> dict:

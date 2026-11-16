@@ -1375,7 +1375,7 @@ cost_per_side: Type.Optional(Type.Number({"description": "每边比例成本0..0
     registerTool({
       name: "get_watchlist",
       description:
-        "读取 dsh 仪表盘自选股列表，按保存的首选写法返回 symbols 和 count；600519/sh600519 等价去重。默认读取 ~/.dsh/stock-analysis/watchlist.json，可用 DSH_HOME 或 STOCK_WATCHLIST_FILE 改路径；文件不存在返回空列表，损坏返回错误",
+        "读取 dsh 仪表盘自选股列表，按保存的首选写法返回 symbols 和 count；600519/sh600519 等价去重。默认读取 $DSH_HOME/stock-analysis/watchlist.json，可用 DSH_HOME 或 STOCK_WATCHLIST_FILE 改路径；文件不存在返回空列表，损坏返回错误",
       parameters: Type.Object({}),
       async execute() {
         const out = await runPy("watchlist.py", ["list"]);
@@ -1618,7 +1618,7 @@ cost_per_side: Type.Optional(Type.Number({"description": "每边比例成本0..0
     registerTool({
       name: "record_signal",
       description:
-        "记录一条 AI 分析建议信号（方向/入场价/目标价/止损价/持有期限），供后续胜率评估。信号持久化在本地 JSONL（$STOCK_SIGNAL_STORE 或 ~/.stock-analysis/signals.jsonl），宿主 Agent 自行决定何时 record/evaluate",
+        "记录一条 AI 分析建议信号（方向/入场价/目标价/止损价/持有期限），供后续胜率评估。信号持久化在本地 JSONL（$STOCK_SIGNAL_STORE 或 $DSH_HOME/stock-analysis/signals.jsonl），宿主 Agent 自行决定何时 record/evaluate",
       parameters: Type.Object({
         symbol: Type.String({ description: "股票代码（A股如600519，美股如AAPL，港股如00700.HK）" }),
         direction: Type.Union([Type.Literal("buy"), Type.Literal("sell")], {

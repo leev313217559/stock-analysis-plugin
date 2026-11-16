@@ -291,3 +291,53 @@ tr:hover .remove, .remove:focus-visible { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ---------- settings editor ---------- */
+.icon-btn { width: 30px; padding: 0; justify-content: center; }
+.icon-close {
+  width: 30px; height: 30px; padding: 0; border: 0; border-radius: 7px;
+  background: transparent; color: var(--muted); font-size: 21px; line-height: 1;
+}
+.icon-close:hover { background: var(--surface-subtle); color: var(--text); }
+body.modal-open { overflow: hidden; }
+.modal {
+  position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-backdrop { position: absolute; inset: 0; background: rgba(8, 12, 18, .52); backdrop-filter: blur(2px); }
+.modal-card {
+  position: relative; display: flex; flex-direction: column; width: min(760px, 100%);
+  max-height: calc(100vh - 48px); padding: 18px; border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface); box-shadow: var(--shadow);
+}
+.modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.modal-head h2 { font-size: 16px; font-weight: 650; }
+.modal-sub { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.settings-path-row { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; }
+.settings-path-row code {
+  flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-subtle); color: var(--muted); font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+#settings-content {
+  width: 100%; min-height: 320px; max-height: 52vh; resize: vertical; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 8px; outline: none;
+  background: var(--surface-subtle); color: var(--text);
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  tab-size: 2;
+}
+#settings-content:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+#settings-content:disabled { opacity: .6; }
+.settings-warnings { margin: 8px 0 0; padding: 0; list-style: none; max-height: 120px; overflow: auto; }
+.settings-warnings li { padding: 3px 0; color: var(--warn); font-size: 12px; }
+.settings-warnings li.error { color: var(--up); }
+.settings-message { min-height: 18px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+.settings-message.ok { color: var(--down); }
+.settings-message.error { color: var(--up); }
+.modal-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.modal-spacer { flex: 1; }
+@media (max-width: 640px) {
+  .modal { padding: 10px; }
+  .modal-card { max-height: calc(100vh - 20px); }
+  #settings-content { min-height: 240px; }
+}

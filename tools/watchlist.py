@@ -12,6 +12,7 @@ from contextlib import nullcontext
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _paths import data_dir
 from _subproc import error_message, utf8_stdio
 from gather import Collection, gather_analysis
 from stock_data import _cn_code
@@ -70,8 +71,7 @@ def analyze_watchlist(symbols: list[str], workers: int = 3, *, session=None, on_
 
 def get_watchlist() -> dict:
     configured = os.environ.get("STOCK_WATCHLIST_FILE")
-    data_root = Path(os.environ.get("DSH_HOME") or Path.home() / ".dsh")
-    path = Path(configured) if configured else data_root / "stock-analysis" / "watchlist.json"
+    path = Path(configured) if configured else data_dir() / "watchlist.json"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:

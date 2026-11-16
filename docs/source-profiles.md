@@ -18,7 +18,7 @@ DATA_SOURCE_PROFILE=full python tools/stock_data.py quote 600519
 The variable is read at call time (no import-time caching), so tests and one-off
 commands can switch per process. Unknown values fall back to `lean`.
 
-`DATA_SOURCE_PROFILE` can also live in `~/.dsh/stock-analysis.env`; every tool
+`DATA_SOURCE_PROFILE` can also live in the dashboard settings (`$DSH_HOME/stock-analysis.env`); every tool
 process loads that file at startup.
 
 ## Capability matrix (lean)

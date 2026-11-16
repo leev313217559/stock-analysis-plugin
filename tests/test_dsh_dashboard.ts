@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,7 @@ import {
   writeWatchlist,
   type RunPy,
 } from "../dsh/dashboard.js";
+import { configFile, dataDir, watchlistFile as watchlistPath } from "../dsh/paths.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..");
@@ -56,6 +57,14 @@ function get(url: string) {
 function post(url: string, value: unknown, origin = "http://127.0.0.1") {
   const req = Readable.from([Buffer.from(JSON.stringify(value))]) as IncomingMessage;
   req.method = "POST";
+  req.url = url;
+  req.headers = { host: "127.0.0.1", origin, "content-type": "application/json" };
+  return req;
+}
+
+function put(url: string, value: unknown, origin = "http://127.0.0.1") {
+  const req = Readable.from([Buffer.from(JSON.stringify(value))]) as IncomingMessage;
+  req.method = "PUT";
   req.url = url;
   req.headers = { host: "127.0.0.1", origin, "content-type": "application/json" };
   return req;
@@ -131,6 +140,82 @@ try {
     assert.equal(readFileSync(watchlistFile, "utf8"), "{broken", "failed POST must preserve the original bytes");
     const snap = await call(handler, get("/stock-analysis/api/snapshot"));
     assert.equal(snap.status(), 500, "a corrupt watchlist is reported, never treated as empty");
+  }
+
+  // ---------- config editor API ----------
+  {
+    const envFile = join(temp, "config", "stock-analysis.env");
+    const handler = createDashboardHandler({ runPy: async () => "{}", watchlistFile, envFile, webDir });
+
+    const missing = await call(handler, get("/stock-analysis/api/config"));
+    assert.equal(missing.status(), 200);
+    assert.equal(missing.json().path, envFile);
+    assert.equal(missing.json().exists, false);
+    assert.ok(missing.json().content.includes("SEC_USER_AGENT"), "missing file shows the template");
+    assert.equal(missing.json().mtimeMs, null);
+
+    const content = "SEC_USER_AGENT=StockAnalysisPlugin test@example.com\nTUSHARE_TOKEN=tushare-token\n";
+    const created = await call(handler, put("/stock-analysis/api/config", { content, expectedMtimeMs: null }));
+    assert.equal(created.status(), 200);
+    assert.equal(readFileSync(envFile, "utf8"), content);
+    if (process.platform !== "win32") assert.equal(statSync(envFile).mode & 0o777, 0o600);
+    assert.equal(created.json().mode, "600");
+
+    const loaded = await call(handler, get("/stock-analysis/api/config"));
+    assert.equal(loaded.json().exists, true);
+    assert.equal(loaded.json().content, content);
+    const firstMtime = loaded.json().mtimeMs as number;
+
+    // External edit: the next save with the old mtime must not overwrite it.
+    utimesSync(envFile, new Date(), new Date(Date.now() + 2000));
+    const conflict = await call(handler, put("/stock-analysis/api/config", { content: "A=1\n", expectedMtimeMs: firstMtime }));
+    assert.equal(conflict.status(), 409);
+    assert.equal(readFileSync(envFile, "utf8"), content, "conflict must preserve the external edit");
+
+    // Syntax errors are rejected with the offending line.
+    const invalid = await call(handler, put("/stock-analysis/api/config", { content: "not a pair\n", expectedMtimeMs: conflict.json().mtimeMs }));
+    assert.equal(invalid.status(), 400);
+    assert.equal(invalid.json().issues[0].line, 1);
+    assert.equal(readFileSync(envFile, "utf8"), content);
+
+    const badProfile = await call(handler, put("/stock-analysis/api/config", { content: "DATA_SOURCE_PROFILE=turbo\n", expectedMtimeMs: conflict.json().mtimeMs }));
+    assert.equal(badProfile.status(), 400);
+    assert.match(badProfile.json().issues[0].message, /lean 或 full/);
+
+    const warned = await call(handler, put("/stock-analysis/api/config", { content: "UNKNOWN_KEY=1\nTAVILY_API_KEY=a\nTAVILY_API_KEY=b\n", expectedMtimeMs: conflict.json().mtimeMs }));
+    assert.equal(warned.status(), 200);
+    assert.ok(warned.json().warnings.some((w: string) => w.includes("未知键 UNKNOWN_KEY")));
+    assert.ok(warned.json().warnings.some((w: string) => w.includes("后者生效")));
+    assert.equal(readFileSync(envFile, "utf8"), "UNKNOWN_KEY=1\nTAVILY_API_KEY=a\nTAVILY_API_KEY=b\n");
+
+    const blocked = await call(handler, put("/stock-analysis/api/config", { content: "A=1\n" }, "http://evil.example"));
+    assert.equal(blocked.status(), 403);
+  }
+
+  // ---------- path resolver matches the Python side ----------
+  {
+    const previousHome = process.env.DSH_HOME;
+    const previousConfig = process.env.STOCK_ANALYSIS_ENV_FILE;
+    const previousWatchlist = process.env.STOCK_WATCHLIST_FILE;
+    try {
+      process.env.DSH_HOME = join(temp, "paths-home");
+      delete process.env.STOCK_ANALYSIS_ENV_FILE;
+      delete process.env.STOCK_WATCHLIST_FILE;
+      assert.equal(dataDir(), join(temp, "paths-home", "stock-analysis"));
+      assert.equal(configFile(), join(temp, "paths-home", "stock-analysis.env"));
+      assert.equal(watchlistPath(), join(temp, "paths-home", "stock-analysis", "watchlist.json"));
+      process.env.STOCK_ANALYSIS_ENV_FILE = join(temp, "custom.env");
+      process.env.STOCK_WATCHLIST_FILE = join(temp, "custom-watchlist.json");
+      assert.equal(configFile(), join(temp, "custom.env"));
+      assert.equal(watchlistPath(), join(temp, "custom-watchlist.json"));
+    } finally {
+      if (previousHome === undefined) delete process.env.DSH_HOME;
+      else process.env.DSH_HOME = previousHome;
+      if (previousConfig === undefined) delete process.env.STOCK_ANALYSIS_ENV_FILE;
+      else process.env.STOCK_ANALYSIS_ENV_FILE = previousConfig;
+      if (previousWatchlist === undefined) delete process.env.STOCK_WATCHLIST_FILE;
+      else process.env.STOCK_WATCHLIST_FILE = previousWatchlist;
+    }
   }
 
   // ---------- snapshot is served from memory and never waits for Python ----------
@@ -404,11 +489,14 @@ try {
     assert.match(page.body(), /股票仪表盘/);
     assert.match(page.headers()["content-type"] as string, /text\/html/);
     assert.match(page.body(), /<script src="\.\/app\.js"/, "the page loads the compiled bundle");
+    assert.match(page.body(), /id="settings"/, "the page exposes the settings button");
+    assert.match(page.body(), /id="settings-modal"/, "the page exposes the settings editor");
     assert.match((await call(handler, get("/stock-analysis/app.js"))).headers()["content-type"] as string, /javascript/);
     for (const asset of ["app.js", "style.css"]) assert.equal((await call(handler, get(`/stock-analysis/${asset}`))).status(), 200);
     assert.equal((await call(handler, get("/stock-analysis/../package.json"))).status(), 404);
     const appSource = readFileSync(join(sourceWeb, "app.ts"), "utf8");
     assert(appSource.includes("./api/snapshot"), "the page reads one memory snapshot");
+    assert(appSource.includes("api/config"), "the settings editor reads/writes the config file");
     assert(!/api\/(?:market|index-trend|watchlist\/quote)/.test(appSource), "the page does not call retired per-symbol routes");
   }
   await handler.settle();

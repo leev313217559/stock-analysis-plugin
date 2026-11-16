@@ -91,6 +91,19 @@ interface Snapshot {
   fetchedAt: string;
 }
 
+interface ConfigIssue { line: number; message: string; }
+interface ConfigFile {
+  path: string;
+  exists: boolean;
+  content: string;
+  mtimeMs: number | null;
+  mode: string | null;
+  warnings: string[];
+  issues: ConfigIssue[];
+}
+interface ConfigSave { ok: boolean; path: string; mtimeMs: number; mode: string; warnings: string[]; }
+type ApiFailure = Error & { status?: number; payload?: { issues?: ConfigIssue[]; mtimeMs?: number | null } };
+
 const POLL_IDLE = 15000;
 const POLL_BUSY = 5000;
 const REQUEST_TIMEOUT = 15000;
@@ -339,7 +352,10 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
     if (!response.ok) {
       const message = (value as { error?: unknown } | null)?.error;
-      throw new Error(typeof message === "string" ? message : `请求失败（${response.status}）`);
+      const failure = new Error(typeof message === "string" ? message : `请求失败（${response.status}）`) as ApiFailure;
+      failure.status = response.status;
+      failure.payload = (value ?? {}) as ApiFailure["payload"];
+      throw failure;
     }
     return value as T;
   } finally {
@@ -913,6 +929,135 @@ function post<T>(path: string, body?: unknown): Promise<T> {
   });
 }
 
+// ---------- credentials settings ----------
+
+const settingsState = { open: false, loading: false, saving: false, loaded: false, mtime: null as number | null, saved: "" };
+
+function setSettingsMessage(text: string, kind: "" | "ok" | "error" = "") {
+  const node = $("settings-message");
+  node.textContent = text;
+  node.className = `settings-message${kind ? ` ${kind}` : ""}`;
+}
+
+function renderSettingsWarnings(warnings: string[], issues: ConfigIssue[] = []) {
+  const list = $("settings-warnings");
+  list.textContent = "";
+  for (const issue of issues) {
+    const item = el("li", "error", `第 ${issue.line} 行：${issue.message}`);
+    list.append(item);
+  }
+  for (const warning of warnings) list.append(el("li", "", warning));
+  list.hidden = list.childElementCount === 0;
+}
+
+function setSettingsBusy(busy: boolean) {
+  settingsState.loading = busy;
+  $<HTMLButtonElement>("settings-save").disabled = busy || !settingsState.loaded;
+  $<HTMLButtonElement>("settings-close").disabled = busy;
+}
+
+async function loadSettings() {
+  setSettingsBusy(true);
+  $("settings-reload").hidden = true;
+  setSettingsMessage("正在加载…");
+  const area = $<HTMLTextAreaElement>("settings-content");
+  area.disabled = true;
+  try {
+    const data = await api<ConfigFile>("api/config");
+    settingsState.mtime = data.mtimeMs;
+    settingsState.saved = data.content;
+    settingsState.loaded = true;
+    $("settings-path").textContent = data.path;
+    area.value = data.content;
+    area.disabled = false;
+    renderSettingsWarnings(data.warnings, data.issues);
+    if (data.issues.length) setSettingsMessage("当前文件有格式问题，保存前请先修正。", "error");
+    else if (!data.exists) setSettingsMessage("文件不存在，保存后创建（权限 600）。");
+    else setSettingsMessage(`已加载${data.mode ? ` · 权限 ${data.mode}` : ""}；修改后点保存。`);
+    area.focus();
+    area.setSelectionRange(0, 0);
+  } catch (error) {
+    settingsState.loaded = false;
+    setSettingsMessage((error as Error).message, "error");
+  } finally {
+    setSettingsBusy(false);
+  }
+}
+
+function openSettings() {
+  if (settingsState.open) return;
+  settingsState.open = true;
+  $("settings-modal").hidden = false;
+  document.body.classList.add("modal-open");
+  $("settings-path").textContent = "—";
+  $("settings-warnings").hidden = true;
+  $("settings-warnings").textContent = "";
+  $("settings-reload").hidden = true;
+  setSettingsMessage("");
+  void loadSettings();
+}
+
+function settingsDirty(): boolean {
+  return $<HTMLTextAreaElement>("settings-content").value !== settingsState.saved;
+}
+
+function closeSettings(force = false) {
+  if (settingsState.saving || settingsState.loading) return;
+  if (!force && settingsDirty() && !confirm("有未保存的修改，确定关闭？")) return;
+  settingsState.open = false;
+  settingsState.loaded = false;
+  $("settings-modal").hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+async function saveSettings() {
+  if (settingsState.saving || !settingsState.loaded) return;
+  const area = $<HTMLTextAreaElement>("settings-content");
+  const content = area.value;
+  settingsState.saving = true;
+  $<HTMLButtonElement>("settings-save").disabled = true;
+  $("settings-reload").hidden = true;
+  setSettingsMessage("保存中…");
+  try {
+    const saved = await api<ConfigSave>("api/config", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content, expectedMtimeMs: settingsState.mtime }),
+    });
+    settingsState.mtime = saved.mtimeMs;
+    settingsState.saved = content;
+    $("settings-path").textContent = saved.path;
+    renderSettingsWarnings(saved.warnings);
+    setSettingsMessage(`已保存 · 权限 ${saved.mode}；下一次工具调用生效。`, "ok");
+  } catch (error) {
+    const failure = error as ApiFailure;
+    const issues = failure.payload?.issues ?? [];
+    if (failure.status === 409) {
+      setSettingsMessage("文件已被外部修改，请点「重新加载」后再保存。", "error");
+      $("settings-reload").hidden = false;
+    } else if (failure.status === 400 && issues.length) {
+      renderSettingsWarnings([], issues);
+      setSettingsMessage(`第 ${issues[0].line} 行：${issues[0].message}`, "error");
+    } else {
+      setSettingsMessage(failure.message || "保存失败", "error");
+    }
+  } finally {
+    settingsState.saving = false;
+    $<HTMLButtonElement>("settings-save").disabled = false;
+  }
+}
+
+async function copySettingsPath() {
+  const path = $("settings-path").textContent ?? "";
+  if (!path || path === "—") return;
+  try {
+    await navigator.clipboard.writeText(path);
+    setSettingsMessage("路径已复制。", "ok");
+  } catch {
+    setSettingsMessage("复制失败，请手动选择路径。", "error");
+  }
+}
+
 // ---------- interactions ----------
 
 function setAddForm(open: boolean) {
@@ -1033,6 +1178,26 @@ $("market-tabs").addEventListener("keydown", event => {
   if (next === undefined) return;
   event.preventDefault();
   selectRegion(REGIONS[(next + REGIONS.length) % REGIONS.length], true);
+});
+
+$("settings").addEventListener("click", openSettings);
+$("settings-close").addEventListener("click", () => closeSettings());
+$("settings-cancel").addEventListener("click", () => closeSettings());
+$("settings-save").addEventListener("click", () => void saveSettings());
+$("settings-reload").addEventListener("click", () => void loadSettings());
+$("settings-copy").addEventListener("click", () => void copySettingsPath());
+$("settings-modal").addEventListener("click", event => {
+  if (event.target === $("settings-modal") || closest(event, "[data-close-settings]")) closeSettings();
+});
+document.addEventListener("keydown", event => {
+  if (!settingsState.open) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeSettings();
+  } else if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    event.preventDefault();
+    void saveSettings();
+  }
 });
 
 // Host theme: the parent dsh shell posts its scheme and palette tokens.

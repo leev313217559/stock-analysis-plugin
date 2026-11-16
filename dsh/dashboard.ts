@@ -1,10 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Context } from "@deepseek-ai/cordis";
+import { configFile, watchlistFile as defaultWatchlistFile } from "./paths.js";
 
 export const DASHBOARD_BASE = "/stock-analysis";
 export type RunPy = (script: string, args: string[], timeoutMs?: number, signal?: AbortSignal) => Promise<string>;
@@ -41,9 +41,165 @@ const RIBBON: Array<[Region, string]> = [
 const TRADING_PHASES = new Set(["morning", "afternoon", "intraday"]);
 
 class HttpError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(readonly status: number, message: string, readonly payload?: Record<string, unknown>) {
     super(message);
   }
+}
+
+
+const CONFIG_TEMPLATE = `# Stock analysis credentials — loaded by every tool process.
+# chmod 600 this file. Environment variables (launchctl/CI) still win.
+
+# SEC EDGAR identity (required for 13F / Form 4)
+# SEC_USER_AGENT=StockAnalysisPlugin your@email
+
+# Search (pick one; Tavily needs a key, SearXNG is self-hosted)
+# TAVILY_API_KEY=
+# SEARXNG_BASE_URLS=http://127.0.0.1:8080
+
+# Optional data providers
+# ALPHAVANTAGE_API_KEY=
+# FINNHUB_API_KEY=
+# TUSHARE_TOKEN=
+# LIXINGER_TOKEN=
+# LONGBRIDGE_APP_KEY=
+# LONGBRIDGE_APP_SECRET=
+# LONGBRIDGE_ACCESS_TOKEN=
+
+# The five variables above only join quote/kline chains in full mode.
+# DATA_SOURCE_PROFILE=full
+
+# Optional sentiment (HK/US); A-shares use eastmoney guba + xueqiu.
+# SENTIMENT_API_URL=https://api.adanos.org
+# SENTIMENT_API_KEY=
+
+# Optional Xueqiu: xq_a_token cookie; expires and carries account/ToS risk.
+# XUEQIU_TOKEN=
+`;
+
+const CONFIG_KEYS = new Set([
+  "SEC_USER_AGENT",
+  "TAVILY_API_KEY",
+  "SEARXNG_BASE_URLS",
+  "ALPHAVANTAGE_API_KEY",
+  "FINNHUB_API_KEY",
+  "TUSHARE_TOKEN",
+  "LIXINGER_TOKEN",
+  "LONGBRIDGE_APP_KEY",
+  "LONGBRIDGE_APP_SECRET",
+  "LONGBRIDGE_ACCESS_TOKEN",
+  "SENTIMENT_API_URL",
+  "SENTIMENT_API_KEY",
+  "XUEQIU_TOKEN",
+  "DATA_SOURCE_PROFILE",
+  "STOCK_WATCHLIST_FILE",
+  "STOCK_CACHE_DIR",
+  "STOCK_SIGNAL_STORE",
+  "STOCK_REVIEW_STORE",
+]);
+
+type ConfigIssue = { line: number; message: string };
+
+function parseConfig(content: string): { warnings: string[]; issues: ConfigIssue[] } {
+  const warnings: string[] = [];
+  const issues: ConfigIssue[] = [];
+  const seen = new Map<string, number>();
+  content.split(/\r?\n/).forEach((raw, index) => {
+    const line = index + 1;
+    let text = raw.trim();
+    if (!text || text.startsWith("#")) return;
+    if (text.startsWith("export ")) text = text.slice(7).trimStart();
+    const equals = text.indexOf("=");
+    if (equals < 0) {
+      issues.push({ line, message: "缺少 KEY=VALUE" });
+      return;
+    }
+    const key = text.slice(0, equals).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+      issues.push({ line, message: "键名不合法" });
+      return;
+    }
+    let value = text.slice(equals + 1).trim();
+    if (value.length >= 2 && value[0] === value[value.length - 1] && (value[0] === "'" || value[0] === '"')) {
+      value = value.slice(1, -1);
+    }
+    if (seen.has(key)) warnings.push(`第 ${line} 行重复定义 ${key}，后者生效`);
+    seen.set(key, line);
+    if (!value) warnings.push(`第 ${line} 行 ${key} 为空，保存后不会生效`);
+    if (!CONFIG_KEYS.has(key)) warnings.push(`第 ${line} 行未知键 ${key}（仍会保存）`);
+    if (key === "DATA_SOURCE_PROFILE" && value !== "lean" && value !== "full") {
+      issues.push({ line, message: "DATA_SOURCE_PROFILE 只能是 lean 或 full" });
+    }
+  });
+  return { warnings, issues };
+}
+
+function readConfig(path: string) {
+  let exists = false;
+  let content = CONFIG_TEMPLATE;
+  let mtimeMs: number | null = null;
+  let mode: string | null = null;
+  let warnings: string[] = [];
+  let issues: ConfigIssue[] = [];
+  try {
+    const stat = statSync(path);
+    exists = true;
+    content = readFileSync(path, "utf8");
+    mtimeMs = stat.mtimeMs;
+    mode = (stat.mode & 0o777).toString(8).padStart(3, "0");
+    if ((stat.mode & 0o077) !== 0) warnings.push(`文件权限为 ${mode}，建议 chmod 600`);
+  } catch (error) {
+    if ((error as { code?: string }).code !== "ENOENT") throw new HttpError(500, "无法读取配置文件");
+  }
+  if (exists) {
+    const parsed = parseConfig(content);
+    warnings = warnings.concat(parsed.warnings);
+    issues = parsed.issues;
+  }
+  return { path, exists, content, mtimeMs, mode, warnings, issues };
+}
+
+function writeConfig(path: string, content: string, expectedMtimeMs: number | null) {
+  const parsed = parseConfig(content);
+  if (parsed.issues.length) throw new HttpError(400, "配置格式不正确", { issues: parsed.issues });
+
+  let current: number | null = null;
+  try {
+    current = statSync(path).mtimeMs;
+  } catch (error) {
+    if ((error as { code?: string }).code !== "ENOENT") throw new HttpError(500, "无法读取配置文件");
+  }
+  if (current === null) {
+    if (expectedMtimeMs !== null) throw new HttpError(409, "配置文件已变化，请重新加载", { mtimeMs: null });
+  } else if (expectedMtimeMs === null || Math.abs(current - expectedMtimeMs) > 0.5) {
+    throw new HttpError(409, "配置文件已被外部修改，请重新加载", { mtimeMs: current });
+  }
+
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const temp = `${path}.tmp-${randomUUID()}`;
+  try {
+    writeFileSync(temp, content, { mode: 0o600 });
+    renameSync(temp, path);
+    try {
+      chmodSync(path, 0o600);
+    } catch {
+      // Windows may not support chmod; the file is still atomic and user-scoped.
+    }
+  } catch {
+    try {
+      rmSync(temp, { force: true });
+    } catch {
+      // best-effort cleanup
+    }
+    throw new HttpError(500, "无法写入配置文件");
+  }
+  const stat = statSync(path);
+  return {
+    path,
+    mtimeMs: stat.mtimeMs,
+    mode: (stat.mode & 0o777).toString(8).padStart(3, "0"),
+    warnings: parsed.warnings,
+  };
 }
 
 function assertApiAccess(req: IncomingMessage) {
@@ -247,6 +403,7 @@ function trendRows(value: unknown): Array<{ date: string; close: number }> {
 export interface DashboardOptions {
   runPy: RunPy;
   watchlistFile: string;
+  envFile?: string;
   webDir: string;
   /** Start the resident background warmer (production). Tests drive `tick()` directly. */
   warm?: boolean;
@@ -260,6 +417,7 @@ type DashboardHandler = ((req: IncomingMessage, res: ServerResponse) => Promise<
 
 export function createDashboardHandler(options: DashboardOptions): DashboardHandler {
   const { runPy, watchlistFile, webDir } = options;
+  const envFile = options.envFile ?? configFile();
   const limiter = createPriorityLimiter(MAX_PYTHON);
   const slots = new Map<string, Slot>();
   const inflight = new Set<Promise<void>>();
@@ -511,6 +669,19 @@ export function createDashboardHandler(options: DashboardOptions): DashboardHand
         kick();
         return sendJson(res, 202, { ok: true, pending: limiter.queued });
       }
+      if (rest === "/api/config") {
+        if (req.method === "GET") return sendJson(res, 200, readConfig(envFile));
+        if (req.method === "PUT") {
+          const body = await readJson(req, 64 * 1024);
+          if (typeof body?.content !== "string") throw new HttpError(400, "content 必须是字符串");
+          const expected = body.expectedMtimeMs ?? null;
+          if (expected !== null && (typeof expected !== "number" || !Number.isFinite(expected))) {
+            throw new HttpError(400, "expectedMtimeMs 必须是数字或 null");
+          }
+          return sendJson(res, 200, { ok: true, ...writeConfig(envFile, body.content, expected) });
+        }
+        return sendJson(res, 405, { error: "Method not allowed" });
+      }
       if (rest === "/api/watchlist") {
         if (req.method === "GET") return sendJson(res, 200, { symbols: readWatchlist(watchlistFile) });
         if (req.method === "POST") {
@@ -542,7 +713,7 @@ export function createDashboardHandler(options: DashboardOptions): DashboardHand
       });
       res.end(req.method === "HEAD" ? undefined : body);
     } catch (error) {
-      if (error instanceof HttpError) return sendJson(res, error.status, { error: error.message });
+      if (error instanceof HttpError) return sendJson(res, error.status, { error: error.message, ...(error.payload ?? {}) });
       const message = error instanceof Error && !/[/\\]/.test(error.message) ? error.message : "仪表盘服务暂时不可用";
       return sendJson(res, 500, { error: message });
     }
@@ -575,13 +746,13 @@ export function registerDashboard(ctx: Context, runPy: RunPy) {
   const here = dirname(fileURLToPath(import.meta.url));
   // Published/dev bundle: dist/web next to dist/index.js; running dsh/index.ts from source uses the last build.
   const webDir = [join(here, "web"), join(here, "dist", "web")].find(dir => existsSync(join(dir, "app.js"))) ?? join(here, "web");
-  const dataRoot = process.env.DSH_HOME || join(homedir(), ".dsh");
-  const watchlistFile = process.env.STOCK_WATCHLIST_FILE || join(dataRoot, "stock-analysis", "watchlist.json");
+  const watchlistFile = defaultWatchlistFile();
+  const envFile = configFile();
   ctx.inject(["webServer"], nested => {
     const c = nested as WebServerContext;
     c.effect(() => {
       // The warmer lives exactly as long as the route: no Web carrier, no background requests.
-      const handler = createDashboardHandler({ runPy, watchlistFile, webDir, warm: true });
+      const handler = createDashboardHandler({ runPy, watchlistFile, envFile, webDir, warm: true });
       const disposeRoute = c.webServer.register({ kind: "prefix", path: DASHBOARD_BASE, handler });
       return () => {
         handler.dispose();

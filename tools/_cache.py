@@ -10,7 +10,10 @@ import time
 from pathlib import Path
 from uuid import uuid4
 
-CACHE_DIR = Path(os.environ.get("STOCK_CACHE_DIR") or Path.home() / ".stock-analysis" / "cache")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _paths import data_dir
+
+CACHE_DIR = Path(os.environ.get("STOCK_CACHE_DIR") or data_dir() / "cache")
 DAY = 86400
 WEEK = 7 * DAY
 

@@ -99,7 +99,7 @@ python3 scripts/gather.py <symbol>
 
 - 给出明确买卖建议（方向 + 入场价/目标价/止损价）时，调 `record_signal` 存档，`source` 填触发该建议的 skill 名（如 `stock-analysis`、`dragon-head`）。
 - 后续会话用 `evaluate_signals` 结算到期信号（target_hit/stop_hit/timeout 并回写收益），用 `get_signal_summary` 复盘胜率与平均收益（可按 source/symbol/status 过滤），同时报告 `return_samples/sample_warning`，缺失收益不按零计；这些是观察性建议记录，不是扣除成本的策略回测。
-- 信号持久化在本地 JSONL（`$STOCK_SIGNAL_STORE` 或 `~/.stock-analysis/signals.jsonl`）；是否记录由宿主 Agent 决定，不阻塞报告输出。
+- 信号持久化在本地 JSONL（`$STOCK_SIGNAL_STORE` 或 `$DSH_HOME/stock-analysis/signals.jsonl`）；是否记录由宿主 Agent 决定，不阻塞报告输出。
 
 ## 注意事项
 - `get_kline` 的 A 股股票/ETF 数据为前复权，每条记录 `adjusted="qfq"`；显式指数 `sh000xxx` / `sz399xxx` 为原始点位，`adjusted="none"`。复权数据源全部失败时说明数据缺失，不用未复权价格补算指标或信号。
@@ -129,7 +129,7 @@ python3 scripts/gather.py <symbol>
 - 股息：`get_dividends` 区分历史、未来已公布除息日历和排行；history/calendar 支持 A/HK/US/JP/KR/TW，排行仍仅 A/HK。预案不计入已实现 TTM 股息。名义每股现金未重算送转股口径，遇送转股时不得据此精确比较持有收益。
 - 两融：`get_margin_trading(include_ratio=true)` 的 `margin_buy_ratio_pct` 只使用同日成交额；null 表示不可计算。
 
-慢变数据存于 `~/.stock-analysis/cache`：财报、基本信息及新历史数据按天，板块映射按周；行情仍实时查询。输出中的报告期/数据日期决定能否用于判断，缓存命中不代表数据已更新。
+慢变数据存于 `$DSH_HOME/stock-analysis/cache`：财报、基本信息及新历史数据按天，板块映射按周；行情仍实时查询。输出中的报告期/数据日期决定能否用于判断，缓存命中不代表数据已更新。
 
 ### 补充数据覆盖
 

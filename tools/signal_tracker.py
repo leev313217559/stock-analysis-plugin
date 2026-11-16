@@ -4,7 +4,7 @@
 The single stateful exception in an otherwise stateless toolset: a small JSONL
 store lets the host agent track the after-the-fact performance of the buy/sell
 suggestions it issues. Store path: $STOCK_SIGNAL_STORE, else
-~/.stock-analysis/signals.jsonl (pathlib.Path.home(), cross-platform). Every
+$DSH_HOME/stock-analysis/signals.jsonl (fallback ~/.dsh). Every
 subcommand accepts --store PATH to override (tests point it at tmp_path). The
 host decides when to record and when to evaluate.
 """
@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _cache import atomic_write, file_lock
+from _paths import data_dir
 from _subproc import command_timeout, error_message, run_tool, utf8_stdio  # noqa: E402
 from stock_data import detect_market  # noqa: E402
 
@@ -53,7 +54,7 @@ def _price_date(value, market):
 
 def _default_store() -> Path:
     env = os.environ.get("STOCK_SIGNAL_STORE")
-    return Path(env) if env else Path.home() / ".stock-analysis" / "signals.jsonl"
+    return Path(env) if env else data_dir() / "signals.jsonl"
 
 
 def _store_path(args) -> Path:

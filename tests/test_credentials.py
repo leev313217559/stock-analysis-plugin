@@ -39,6 +39,13 @@ def test_real_environment_wins(tmp_path, monkeypatch):
     assert os.environ["SA_TEST_PRECEDENCE"] == "from-env"
 
 
+def test_duplicate_keys_last_wins(tmp_path, monkeypatch):
+    monkeypatch.delenv("SA_TEST_DUP", raising=False)
+    path = _write(tmp_path, "SA_TEST_DUP=first\nSA_TEST_DUP=second\n")
+    assert _credentials.load_credentials(path, force=True) == path
+    assert os.environ["SA_TEST_DUP"] == "second"
+
+
 def test_invalid_lines_are_ignored(tmp_path, monkeypatch):
     monkeypatch.delenv("SA_TEST_OK", raising=False)
     path = _write(

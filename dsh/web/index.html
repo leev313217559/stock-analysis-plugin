@@ -26,6 +26,9 @@
           <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
           <span>添加</span>
         </button>
+        <button id="settings" class="btn ghost icon-btn" type="button" title="凭证与配置" aria-label="凭证与配置">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.2 14.4a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 14.4a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.16a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 8.96 3.8a1.7 1.7 0 0 0 1.03-1.56V2a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V8.4a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.03Z"/></svg>
+        </button>
       </div>
     </header>
 
@@ -81,6 +84,32 @@
     </section>
 
     <footer class="foot">报价可能延迟，悬停名称可查看来源与报价时间。交易时段内有页面打开时约每 30 秒更新一次，后台每 5 分钟预热；30 日走势为最近 30 个有效交易日收盘价。</footer>
+  </div>
+  <div id="settings-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-settings></div>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <header class="modal-head">
+        <div>
+          <h2 id="settings-title">凭证与配置</h2>
+          <p class="modal-sub">此页面包含密钥，投屏或截图时请注意。</p>
+        </div>
+        <button id="settings-close" class="icon-close" type="button" aria-label="关闭">×</button>
+      </header>
+      <div class="settings-path-row">
+        <code id="settings-path">—</code>
+        <button id="settings-copy" class="btn ghost" type="button">复制路径</button>
+      </div>
+      <label class="sr-only" for="settings-content">配置文件内容</label>
+      <textarea id="settings-content" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" placeholder="加载中…" disabled></textarea>
+      <ul id="settings-warnings" class="settings-warnings" hidden></ul>
+      <p id="settings-message" class="settings-message" role="status" aria-live="polite"></p>
+      <footer class="modal-actions">
+        <button id="settings-reload" class="btn ghost" type="button" hidden>重新加载</button>
+        <span class="modal-spacer"></span>
+        <button id="settings-cancel" class="btn ghost" type="button">取消</button>
+        <button id="settings-save" class="btn primary" type="button" disabled>保存</button>
+      </footer>
+    </section>
   </div>
   <div id="tip" class="tip" role="tooltip" hidden></div>
 </body>

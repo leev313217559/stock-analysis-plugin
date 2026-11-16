@@ -5,10 +5,8 @@ for per-user API tokens. Instead, every tool process loads one small env-style
 file before reading credentials. Editing the file takes effect on the next tool
 call (no host restart); MCP servers are long-lived and load it at startup.
 
-Resolution order:
-1. ``STOCK_ANALYSIS_ENV_FILE`` (explicit path; useful for tests/CI)
-2. ``$DSH_HOME/stock-analysis.env``
-3. ``~/.dsh/stock-analysis.env``
+Default path: ``$DSH_HOME/stock-analysis.env`` (fallback ``~/.dsh``). An
+explicit ``STOCK_ANALYSIS_ENV_FILE`` overrides it for tests/CI.
 
 File format: one ``KEY=VALUE`` per line; blank lines and full-line ``#`` comments
 are ignored; an optional ``export `` prefix and matching single/double quotes are
@@ -23,19 +21,18 @@ from __future__ import annotations
 import os
 import re
 import stat
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _paths import config_file
 
 KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _loaded: set[str] = set()
 
 
 def default_path() -> Path:
-    override = os.environ.get("STOCK_ANALYSIS_ENV_FILE")
-    if override:
-        return Path(override).expanduser()
-    dsh_home = os.environ.get("DSH_HOME")
-    base = Path(dsh_home).expanduser() if dsh_home else Path.home() / ".dsh"
-    return base / "stock-analysis.env"
+    return config_file().expanduser()
 
 
 def _parse_line(line: str) -> tuple[str, str] | None:
@@ -69,13 +66,14 @@ def load_credentials(path: str | Path | None = None, *, force: bool = False) -> 
         text = target.read_text(encoding="utf-8")
     except OSError:
         return None
+    # Duplicate keys: last value wins, matching the settings editor's warning.
+    values: dict[str, str] = {}
     for line in text.splitlines():
         parsed = _parse_line(line)
-        if not parsed:
-            continue
-        name, value = parsed
-        if value:
-            os.environ.setdefault(name, value)
+        if parsed and parsed[1]:
+            values[parsed[0]] = parsed[1]
+    for name, value in values.items():
+        os.environ.setdefault(name, value)
     return target
 
 
