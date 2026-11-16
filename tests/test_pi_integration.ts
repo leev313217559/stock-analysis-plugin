@@ -56,6 +56,7 @@ const EXPECTED_TOOLS = [
   "search_stock_news",
   "search_comprehensive_intel",
   "get_social_sentiment",
+  "get_trending_sentiment",
   "extract_article",
   "screen_risk",
   "detect_market_regime",

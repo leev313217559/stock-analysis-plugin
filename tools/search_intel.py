@@ -314,11 +314,33 @@ def get_social_sentiment(symbol: str) -> dict:
         xueqiu = _xueqiu_heat(symbol)
         if xueqiu:
             result["sources"]["xueqiu"] = xueqiu
+    else:
+        api_url = os.environ.get("SENTIMENT_API_URL", "https://api.adanos.org")
+        api_key = os.environ.get("SENTIMENT_API_KEY")
+
+        try:
+            import requests
+
+            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+
+            for source in ["reddit", "twitter", "polymarket"]:
+                try:
+                    resp = requests.get(f"{api_url}/sentiment/{source}/{symbol}", headers=headers, timeout=10)
+                    if resp.ok:
+                        result["sources"][source] = resp.json()
+                except Exception:
+                    pass
+        except ImportError:
+            result["error"] = "requests library not available"
+
     if not result["sources"]:
         if market == "A":
             result["note"] = "No A-share sentiment data available. 东方财富/雪球 APIs may be temporarily unavailable."
         else:
-            result["note"] = "Social sentiment is A-share only (eastmoney guba + xueqiu)."
+            result["note"] = (
+                "No sentiment data available. Set SENTIMENT_API_URL and SENTIMENT_API_KEY, "
+                "or ensure the sentiment API is accessible."
+            )
 
     result["additional_context"] = {
         "wisburg_mcp": "Use 'list-feed' and 'list-market-daily' MCP tools for institutional research context.",
@@ -328,6 +350,42 @@ def get_social_sentiment(symbol: str) -> dict:
 
 
 # --------------- Trending Aggregation ---------------
+
+
+def get_trending_sentiment() -> dict:
+    """Fetch trending sentiment from Reddit/X/Polymarket."""
+    api_url = os.environ.get("SENTIMENT_API_URL", "https://api.adanos.org")
+    api_key = os.environ.get("SENTIMENT_API_KEY")
+
+    result = {"trending": {}, "fetched_at": None}
+
+    try:
+        import requests
+
+        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+
+        for source in ["reddit", "twitter", "polymarket"]:
+            try:
+                resp = requests.get(f"{api_url}/trending/{source}", headers=headers, timeout=10)
+                if resp.ok:
+                    result["trending"][source] = resp.json()
+            except Exception:
+                pass
+    except ImportError:
+        result["error"] = "requests library not available"
+
+    if not result["trending"]:
+        result["note"] = "No trending data available. Set SENTIMENT_API_URL and SENTIMENT_API_KEY."
+
+    result["fetched_at"] = _time.strftime("%Y-%m-%d %H:%M:%S")
+    result["additional_context"] = {
+        "wisburg_mcp": "Use 'list-feed' for latest research feed and 'list-market-daily' for market daily digest.",
+    }
+
+    return result
+
+
+# --------------- Article Extraction ---------------
 
 
 def _extract_pdf(url: str, max_chars: int, response) -> dict:
@@ -431,6 +489,10 @@ def cmd_sentiment(args):
     return get_social_sentiment(args.symbol)
 
 
+def cmd_trending(args):
+    return get_trending_sentiment()
+
+
 def cmd_extract(args):
     return extract_article(args.url, max_chars=args.max_chars)
 
@@ -450,6 +512,8 @@ def main():
     p_sent = sub.add_parser("sentiment")
     p_sent.add_argument("symbol", help="Stock ticker (e.g. AAPL, 600519, 00700.HK)")
 
+    sub.add_parser("trending")
+
     p_ext = sub.add_parser("extract")
     p_ext.add_argument("url", help="Article or PDF URL to extract")
     p_ext.add_argument("--max-chars", type=int, default=3000, help="Maximum extracted characters (1-200000)")
@@ -463,6 +527,7 @@ def main():
         "search": cmd_search,
         "comprehensive": cmd_comprehensive,
         "sentiment": cmd_sentiment,
+        "trending": cmd_trending,
         "extract": cmd_extract,
     }
     result = dispatch[args.command](args)

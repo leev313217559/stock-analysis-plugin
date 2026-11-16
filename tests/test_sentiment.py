@@ -6,6 +6,7 @@ from tools.search_intel import (
     _eastmoney_guba_heat,
     _xueqiu_heat,
     get_social_sentiment,
+    get_trending_sentiment,
 )
 
 
@@ -106,15 +107,17 @@ class TestGetSocialSentimentMarketDetection:
         mock_guba.assert_called_once_with("600519")
         mock_xueqiu.assert_called_once_with("600519")
 
-    def test_us_stock_returns_a_share_only_note(self):
+    @patch("requests.get")
+    def test_us_stock_routes_to_adanos(self, mock_get):
+        mock_get.return_value = MagicMock(ok=True, json=lambda: {"score": 0.8})
         result = get_social_sentiment("AAPL")
-        assert result["sources"] == {}
-        assert "A-share only" in result["note"]
+        assert "reddit" in result["sources"] or "twitter" in result["sources"] or "polymarket" in result["sources"]
 
-    def test_hk_stock_returns_a_share_only_note(self):
+    @patch("requests.get")
+    def test_hk_stock_routes_to_adanos(self, mock_get):
+        mock_get.return_value = MagicMock(ok=True, json=lambda: {"score": 0.7})
         result = get_social_sentiment("0700.HK")
-        assert result["sources"] == {}
-        assert "A-share only" in result["note"]
+        assert "eastmoney_guba" not in result["sources"]
 
     @patch("tools.search_intel._xueqiu_heat")
     @patch("tools.search_intel._eastmoney_guba_heat")
@@ -131,5 +134,27 @@ class TestGetSocialSentimentMarketDetection:
             patch("tools.search_intel._xueqiu_heat", return_value={}),
         ):
             result = get_social_sentiment("600519")
+        assert "additional_context" in result
+        assert "wisburg_mcp" in result["additional_context"]
+
+
+class TestTrendingSentiment:
+    @patch("requests.get")
+    def test_fetches_all_sources(self, mock_get):
+        mock_get.return_value = MagicMock(ok=True, json=lambda: [{"ticker": "AAPL", "buzz": 95}])
+        result = get_trending_sentiment()
+        assert "trending" in result
+        assert "fetched_at" in result
+        assert mock_get.call_count == 3  # reddit, twitter, polymarket
+
+    @patch("requests.get")
+    def test_api_failure_returns_note(self, mock_get):
+        mock_get.side_effect = Exception("network error")
+        result = get_trending_sentiment()
+        assert "note" in result
+
+    def test_wisburg_context_present(self):
+        with patch("requests.get", return_value=MagicMock(ok=True, json=lambda: [])):
+            result = get_trending_sentiment()
         assert "additional_context" in result
         assert "wisburg_mcp" in result["additional_context"]

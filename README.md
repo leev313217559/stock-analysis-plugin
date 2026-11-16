@@ -24,7 +24,7 @@
 - **策略视角**：缠论、波浪理论、龙头战法、情绪周期等 18 套方法论，以 Skill 形式按需调用。
 - **dsh 仪表盘**：在 dsh Web / Desktop 侧栏看自选股和六个市场的行情，后台预热，打开即显示。
 
-一共 72 个工具、21 个 Skills，按能力保留 2-3 个可靠源自动降级。大部分功能不需要任何 API Key。
+一共 73 个工具、21 个 Skills，按能力保留 2-3 个可靠源自动降级。大部分功能不需要任何 API Key。
 
 ## 快速开始
 
@@ -118,6 +118,13 @@
 | `TAVILY_API_KEY` | Tavily 搜索 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例地址（逗号分隔多个，无需 Key，兜底用） |
 
+**社交舆情（可选）：**
+
+| 环境变量 | 用途 |
+|---------|------|
+| `SENTIMENT_API_URL` | 舆情 API 地址（默认 `https://api.adanos.org`） |
+| `SENTIMENT_API_KEY` | 舆情 API 密钥（港美 Reddit / X / Polymarket；A 股不需要） |
+
 </details>
 
 ## Skills 一览
@@ -155,7 +162,7 @@
 
 ## 工具列表
 
-72 个工具按用途分组：
+73 个工具按用途分组：
 
 | 类别 | 数量 | 主要内容 |
 |------|------|----------|
@@ -168,7 +175,7 @@
 | 无状态研究与风险计算 | 8 | 同行比较、公告变更、组合风险、调仓计划、仓位计算、事件研究、回测稳健性 |
 
 <details>
-<summary>完整工具列表（72 个）</summary>
+<summary>完整工具列表（73 个）</summary>
 
 #### 数据获取
 
@@ -238,7 +245,8 @@
 |------|------|
 | `search_stock_news` | 关键词搜索新闻 |
 | `search_comprehensive_intel` | 综合情报搜索 |
-| `get_social_sentiment` | 社交媒体情绪（仅 A 股：东财股吧 + 雪球；雪球需 `XUEQIU_TOKEN`） |
+| `get_social_sentiment` | 社交媒体情绪（A 股：东财股吧 + 雪球，雪球需 `XUEQIU_TOKEN`；港美：Reddit / X / Polymarket，需 `SENTIMENT_API_KEY`） |
+| `get_trending_sentiment` | 社交媒体热门趋势聚合（Reddit / X / Polymarket） |
 | `extract_article` | 网页 / 公告 PDF 正文提取；`max_chars` 默认 3000、上限 200000，返回 `truncated` |
 
 #### 辅助
@@ -409,6 +417,27 @@ python tools/sec_edgar.py holdings 0000320193 --mode issuer   # 发行人 CIK �
 
 </details>
 
+## 与上游的差异（合并上游时请先看）
+
+本 fork 有意删除/保留了一些数据源，合并上游代码时不要把它们带回来：
+
+| 已删除 | 原因 |
+|---|---|
+| `baostock` | 旧的 K 线兜底腿，额外依赖、实际很少胜出；K 线保留腾讯 → 新浪 → akshare |
+| TIAA / youzhiyouxing | 投顾组合披露受众极窄，维护一整套解析路径成本高 |
+| Brave / Bocha / SerpAPI 搜索客户端 | 与 Tavily / SearXNG 重复，实际长期未配置；搜索只保留后两者 |
+
+| 已保留（不要误删） | 原因 |
+|---|---|
+| 雪球 | A 股行业兜底 + 讨论热度；需 `XUEQIU_TOKEN`，无 token 时自动跳过 |
+| adanos 舆情 | 港美 Reddit / X / Polymarket 情绪；需 `SENTIMENT_API_KEY`，A 股不受影响 |
+| 百度热榜 | 东财限流时的免 key 兜底 |
+| efinance | 东财限流时兜住个股资金流 |
+| 北向资金 | 已停更，但保留工具并明确标注历史口径 |
+| Tushare / Longbridge / Finnhub / AlphaVantage / 理杏仁 | 有 key 才启用，零运行时成本 |
+
+完整评估记录见 [`docs/source-audit.md`](docs/source-audit.md)。
+
 ## 常见问题
 
 **Python 工具报错 `ModuleNotFoundError`？**
@@ -445,7 +474,7 @@ sort_order: "desc"
 npm install                                   # 同时构建仓库 .venv
 .venv/bin/python -m pytest -q                 # Python 单元测试（离线）
 npx tsc --noEmit                              # TypeScript 类型检查
-npx tsx tests/test_adapter_parity.ts          # 四个宿主的 72 个工具和参数映射一致
+npx tsx tests/test_adapter_parity.ts          # 四个宿主的 73 个工具和参数映射一致
 npm run build:openclaw && npm run build:dsh   # 构建 OpenClaw / dsh bundle
 ```
 
@@ -457,20 +486,20 @@ npm run build:openclaw && npm run build:dsh   # 构建 OpenClaw / dsh bundle
 ```
 stock-analysis/
 ├── pi/                              # Pi Agent Extension
-│   └── index.ts                     #   注册 72 个工具 + 21 个 skill
+│   └── index.ts                     #   注册 73 个工具 + 21 个 skill
 ├── hermes/                          # Hermes Agent Plugin
 │   ├── plugin.yaml                  #   插件清单
 │   ├── __init__.py                  #   register(ctx) 入口
 │   ├── schemas.py                   #   工具 JSON Schema 定义
-│   └── tools.py                     #   72 个 handler → subprocess 调 CLI
+│   └── tools.py                     #   73 个 handler → subprocess 调 CLI
 ├── openclaw/                        # OpenClaw Plugin
 │   ├── openclaw.plugin.json         #   manifest（contracts.tools）
 │   ├── package.json                 #   含 openclaw 块（pluginApi/SDK 版本）
-│   └── index.ts                     #   definePluginEntry + registerTool ×72
+│   └── index.ts                     #   definePluginEntry + registerTool ×73
 ├── dsh/                             # DeepSeek Harness (dsh) Plugin
 │   ├── cordis.patch.yml             #   bundle patch（insert 插件入口）
 │   ├── package.json                 #   dsh.bundle + dsh.client manifest
-│   ├── index.ts                     #   cordis apply(ctx) + defineTool ×72
+│   ├── index.ts                     #   cordis apply(ctx) + defineTool ×73
 │   ├── dashboard.ts                 #   后台预热缓存 + 快照/自选股 HTTP API 与持久化
 │   ├── client.ts                    #   侧栏入口 + 主面板 + 主题同步（编译为 dist/client.js）
 │   └── web/                         #   仪表盘页面（app.ts 编译为 dist/web/app.js）

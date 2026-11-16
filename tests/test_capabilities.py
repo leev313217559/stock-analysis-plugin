@@ -14,9 +14,9 @@ class TestGetCapabilities:
         assert "get_chip_distribution" in unsupported_tools
         assert "get_capital_flow" in unsupported_tools
         assert "screen_risk" in unsupported_tools
-        # kline is universal; social sentiment is A-share only
+        # kline is universal
         assert "get_kline" in result["supported"]
-        assert "get_social_sentiment" in unsupported_tools
+        assert "get_social_sentiment" in result["supported"]
 
     def test_us_rejects_a_share_only_tools(self):
         result = capabilities.get_capabilities("US")

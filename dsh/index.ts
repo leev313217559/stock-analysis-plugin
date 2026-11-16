@@ -1297,7 +1297,7 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
     pyTool({
       name: "get_social_sentiment",
       description:
-        "获取 A 股社交媒体情绪数据：东方财富股吧热度 + 雪球讨论热度（雪球需设置 XUEQIU_TOKEN）。仅支持 A 股。",
+        "获取股票社交媒体情绪数据。A股：东方财富股吧热度+雪球讨论热度（雪球需 XUEQIU_TOKEN）；美股/港股：Reddit/X/Polymarket情绪（需 SENTIMENT_API_KEY）。自动按市场选数据源。面向个股维度；全市场热门讨论用 get_trending_sentiment",
       parameters: {
         symbol: { type: "string", required: true, description: "股票代码（A股如600519，美股如AAPL，港股如00700.HK）" },
       },
@@ -1306,6 +1306,17 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
     })
   );
 
+
+  register(
+    pyTool({
+      name: "get_trending_sentiment",
+      description:
+        "获取社交媒体热门趋势（Reddit/X/Polymarket热门股票讨论）。适用于发现市场热点；查个股情绪用 get_social_sentiment",
+      parameters: {},
+      script: "search_intel.py",
+      argv: () => ["trending"],
+    })
+  );
 
   register(
     pyTool({

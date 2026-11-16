@@ -15,6 +15,13 @@ from __future__ import annotations
 
 import os
 
+# Fork policy — do not reintroduce these when merging upstream:
+# - baostock: legacy A-share kline backstop; extra dependency, rarely won.
+# - TIAA / youzhiyouxing: niche advisory-portfolio metadata; heavy parse paths.
+# - Brave / Bocha / SerpAPI search clients: redundant; Tavily + SearXNG cover search.
+# Kept optional on purpose (key/token gated): xueqiu, adanos, tushare, longbridge,
+# finnhub, alphavantage, lixinger; baidu is the keyless hot-stock backstop.
+
 PROFILE_ENV = "DATA_SOURCE_PROFILE"
 DEFAULT_PROFILE = "lean"
 

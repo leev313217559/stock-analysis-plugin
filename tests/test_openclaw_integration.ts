@@ -253,6 +253,7 @@ const sampleArgs: Record<string, Record<string, unknown>> = {
   search_stock_news: { query: "茅台" },
   search_comprehensive_intel: { symbol: "600519" },
   get_social_sentiment: { symbol: "AAPL" },
+  get_trending_sentiment: {},
   extract_article: { url: "https://example.com", max_chars: 20000 },
   screen_risk: { symbol: "600519" },
   detect_market_regime: {},

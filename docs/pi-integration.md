@@ -125,7 +125,7 @@ git pull && npm install
 
 ```
 stock-analysis-plugin/
-├── pi/index.ts           # Pi Extension 入口，注册 72 个工具和 21 个 Skill
+├── pi/index.ts           # Pi Extension 入口，注册 73 个工具和 21 个 Skill
 ├── tools/                # 共享 Python CLI
 ├── skills/               # SKILL.md
 ├── schemas/ templates/ strategies/

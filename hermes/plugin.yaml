@@ -55,6 +55,7 @@ provides_tools:
   - search_stock_news
   - search_comprehensive_intel
   - get_social_sentiment
+  - get_trending_sentiment
   - extract_article
   - screen_risk
   - detect_market_regime
@@ -79,6 +80,12 @@ requires_env:
     description: "Tavily search API key (optional, one search engine is enough)"
     url: "https://tavily.com"
     secret: true
+  - name: SENTIMENT_API_KEY
+    description: "Social sentiment API key (optional, for Eastmoney + Xueqiu)"
+    secret: true
+  - name: SENTIMENT_API_URL
+    description: "Sentiment API endpoint (default: https://api.adanos.org)"
+    secret: false
   - name: FINNHUB_API_KEY
     description: "Finnhub API key (US stock quotes and financials)"
     url: "https://finnhub.io"

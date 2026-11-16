@@ -10,7 +10,7 @@ removals), **Phase 3 done** (contract fixtures). Production defaults to
 |---|---|---|
 | Market data providers | tencent, sina, eastmoney (push2/datacenter/emweb), cninfo, csindex, legulegu, hkex, sse, szse, sec.gov, yfinance | keyless or account/cookie based; rename/rate-limit/HTML-challenge risk |
 | Keyed providers | tushare, longbridge, finnhub, alphavantage, lixinger, xueqiu | optional; fail fast when the key is absent |
-| Search/sentiment | tavily, searxng, eastmoney guba, xueqiu | key/self-host; RSS/JSON drift |
+| Search/sentiment | tavily, searxng, adanos, eastmoney guba, xueqiu | key/self-host; RSS/JSON drift |
 | Protocols | HTTP JSON, HTML/JS pages, MCP stdio, CLI stdout JSON, DSH tool schema, OpenAI-compatible API | own protocols are stable; third-party pages are not |
 | Runtimes/packages | Python 3.10/3.11, Node 24, akshare/yfinance/pandas, DSH/hosts | drift handled by compat shims + Dependabot |
 | Upstream code | Weaxs repository | merged, reviewed, never trusted blindly |
@@ -22,7 +22,7 @@ removals), **Phase 3 done** (contract fixtures). Production defaults to
 | 1 | **baostock** | A-share kline backstop | 18 files | excluded | **remove** | legacy leg, extra dependency, rarely wins; K-line stays tencent + sina + akshare |
 | 2 | **baidu hot list** | hot-stocks backstop | 2 files | kept | **decide** | keeping it restores a second keyless leg; dropping it makes `hot_stocks` fail whenever eastmoney throttles (observed locally) |
 | 3 | **TIAA / youzhiyouxing** | US advisory-portfolio metadata and disclosures | 15 files | active (niche) | **remove** | very narrow audience, extra parse paths; removal touches quote path + tests |
-| 4 | **adanos sentiment** | HK/US social sentiment | 6 files | active if key | **remove** | unstable third-party, non-core; A-share guba/xueqiu stay |
+| 4 | **adanos sentiment** | HK/US social sentiment | 6 files | kept | **keep** | restored by decision (2026-11-16); key-gated, zero cost without a key; A-share guba/xueqiu unchanged |
 | 5 | **search engines** | news/sentiment search | 6–9 each | all clients kept | **keep 1–2** | no engine configured today → news search returns empty; recommend one hosted key (Tavily) plus self-hosted SearXNG optional |
 | 6 | **northbound flow** | market-level northbound history | 1 tool | active | **keep, mark historical** | exchanges stopped daily publication 2024-08; tool already returns a clean explanation |
 | 7 | **JP/KR/TW markets** | yfinance-only quotes/klines | many | active | **keep** | no extra provider cost; user can ignore these markets |
@@ -51,14 +51,15 @@ removals), **Phase 3 done** (contract fixtures). Production defaults to
   throttle still has a keyless backstop.
 - **TIAA / youzhiyouxing removed**: `tiaa_disclosures.py` deleted, the TIAA quote
   path and adapter descriptions dropped, tests removed.
-- **adanos removed**: HK/US social sentiment is now an explicit A-share-only note;
-  the `get_trending_sentiment` tool was removed everywhere (72 tools now).
+- **adanos restored** (decision 2026-11-16): HK/US social sentiment and the
+  `get_trending_sentiment` tool are back in all four adapters, and
+  `SENTIMENT_API_URL` / `SENTIMENT_API_KEY` are documented again (73 tools).
 - **Search engines**: kept Tavily + SearXNG; Brave / Bocha / SerpAPI clients and
   their env vars were removed.
 - **Xueqiu kept and wired**: `_xueqiu_heat` reads `XUEQIU_TOKEN` (skips the request
   without it); industry fallback was already token-gated.
 - **Northbound** stays as a historical series with its existing disclosure note.
-- Verification: `pytest` 2169 passed; adapter parity 72 tools; DSH/Pi/OpenClaw
+- Verification: `pytest` 2169 passed; adapter parity 73 tools; DSH/Pi/OpenClaw
   integration tests pass.
 
 ## Decisions (resolved)
@@ -66,6 +67,6 @@ removals), **Phase 3 done** (contract fixtures). Production defaults to
 1. Remove **baostock** (kline backstop)? Recommend yes.
 2. Keep **baidu** as the second hot-stocks leg, or accept eastmoney-only? Recommend keep baidu.
 3. Remove **TIAA / youzhiyouxing**? Recommend yes.
-4. Remove **adanos sentiment**? Recommend yes.
+4. ~~Remove **adanos sentiment**?~~ → restored on 2026-11-16 (keep key-gated).
 5. Which search engine(s) to keep: **Tavily** (hosted key), **SearXNG** (self-host), both, or none? Recommend Tavily + optional SearXNG.
 6. Confirm **Xueqiu stays** and wire `_xueqiu_heat` to `XUEQIU_TOKEN`? Recommend yes.
