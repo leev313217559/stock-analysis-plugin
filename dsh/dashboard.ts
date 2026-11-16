@@ -66,7 +66,10 @@ const CONFIG_TEMPLATE = `# Stock analysis credentials — loaded by every tool p
 # LONGBRIDGE_APP_SECRET=
 # LONGBRIDGE_ACCESS_TOKEN=
 
-# The five variables above only join quote/kline chains in full mode.
+# 数据源模式（可选，默认 lean）：
+#   lean = 只用免 key 的稳定源（腾讯/新浪/东财/同花顺/yfinance 等），每个能力 2-3 个，日常够用。
+#   full = 额外启用 Tushare / Longbridge / Finnhub / AlphaVantage 等需要 key 的源，降级链更长、更慢。
+# 只有希望上面这些 key 源参与报价/K 线时才改成 full；否则保持注释或写 lean。
 # DATA_SOURCE_PROFILE=full
 
 # Optional sentiment (HK/US); A-shares use eastmoney guba + xueqiu.

@@ -1015,6 +1015,7 @@ async function saveSettings() {
   const area = $<HTMLTextAreaElement>("settings-content");
   const content = area.value;
   settingsState.saving = true;
+  let savedOk = false;
   $<HTMLButtonElement>("settings-save").disabled = true;
   $("settings-reload").hidden = true;
   setSettingsMessage("保存中…");
@@ -1029,6 +1030,7 @@ async function saveSettings() {
     $("settings-path").textContent = saved.path;
     renderSettingsWarnings(saved.warnings);
     setSettingsMessage(`已保存 · 权限 ${saved.mode}；下一次工具调用生效。`, "ok");
+    savedOk = true;
   } catch (error) {
     const failure = error as ApiFailure;
     const issues = failure.payload?.issues ?? [];
@@ -1044,6 +1046,7 @@ async function saveSettings() {
   } finally {
     settingsState.saving = false;
     $<HTMLButtonElement>("settings-save").disabled = false;
+    if (savedOk) closeSettings(true);
   }
 }
 

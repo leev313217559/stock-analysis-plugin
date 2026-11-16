@@ -120,6 +120,9 @@
 - 真实环境变量优先（launchctl / CI / shell 不会被文件覆盖）
 - 文件首次保存时创建，权限 600；权限过宽会在设置页和 `diagnostics` 中提示
 - 文件被外部编辑器改过时，保存会提示冲突并支持重新加载，不会覆盖外部修改
+- `DATA_SOURCE_PROFILE`：
+  - 不写或 `lean`（默认）：只用免 key 的稳定源，每个能力 2~3 个
+  - `full`：额外启用 Tushare / Longbridge / Finnhub / AlphaVantage 等需要 key 的源，降级链更长、更慢
 - MCP server 是长驻进程，修改后需要重启 MCP server/客户端
 
 `tools/diagnostics.py check` 会显示配置文件路径、是否存在、权限是否过宽，但不会显示值。
