@@ -53,7 +53,10 @@ def cn_trade_dates(year: int) -> set[str]:
             import akshare as ak
 
             with socket_timeout(25):
-                df = ak.tool_trade_date_hist_sina()
+                fetch = getattr(ak, "calendar_trade_date_hist_sina", None) or getattr(ak, "tool_trade_date_hist_sina", None)
+                if fetch is None:
+                    raise AttributeError("akshare provides no trade-date calendar")
+                df = fetch()
             if df is None or df.empty:
                 return []
             return sorted({date.fromisoformat(str(value)[:10]).isoformat() for value in df.iloc[:, 0]})

@@ -35,6 +35,16 @@ def index_hist_csindex(**kwargs):
     return fetch(**kwargs)
 
 
+def index_value_csindex(**kwargs):
+    """akshare renamed the CSI index valuation API; accept both old and new names."""
+    import akshare as ak
+
+    fetch = getattr(ak, "index_value_csindex", None) or getattr(ak, "stock_zh_index_value_csindex", None)
+    if fetch is None:
+        raise AttributeError("akshare provides no index_value_csindex")
+    return fetch(**kwargs)
+
+
 def records(frame):
     if frame is None:
         raise ValueError("provider returned no dataset")
@@ -267,7 +277,7 @@ def index_valuation(args):
         capture(
             section,
             "recent",
-            lambda: dataset(f"csi-valuation:{code}", lambda: ak.stock_zh_index_value_csindex(symbol=code)),
+            lambda: dataset(f"csi-valuation:{code}", lambda: index_value_csindex(symbol=code)),
         )
         for row in section.get("recent", []):
             stamp = iso(row.get("日期"))
@@ -1312,7 +1322,7 @@ def etf_details(args):
         "nav_history",
         lambda: dataset(
             f"etf-nav:{symbol}:{args.days}:{end.isoformat()}",
-            lambda: (getattr(ak, "fund_exchange_nav_hist_em", None) or ak.fund_etf_fund_info_em)(
+            lambda: (getattr(ak, "fund_exchange_nav_hist_em", None) or getattr(ak, "fund_etf_fund_info_em", None))(
                 fund=symbol, start_date=start.strftime("%Y%m%d"), end_date=end.strftime("%Y%m%d")
             ),
         ),
