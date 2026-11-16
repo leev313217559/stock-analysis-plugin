@@ -90,6 +90,32 @@
 
 各数据源按优先级自动尝试，失败后切换到下一个；未配置 API Key 的数据源自动跳过。A 股单票报价优先使用腾讯和新浪，不依赖东财域名，境外网络通常也能用。港股备用源、指数前缀、K 线复权口径等细节见 [数据源与数据口径](docs/data-sources.md)。
 
+## 凭证文件（推荐）
+
+不想用 `launchctl` 的话，把 token 写到一个文件里即可，工具每次启动都会读取：
+
+```text
+~/.dsh/stock-analysis.env
+```
+
+优先级：`STOCK_ANALYSIS_ENV_FILE` > `$DSH_HOME/stock-analysis.env` > `~/.dsh/stock-analysis.env`。
+
+```bash
+chmod 600 ~/.dsh/stock-analysis.env
+cat > ~/.dsh/stock-analysis.env <<'EOF'
+SEC_USER_AGENT=StockAnalysisPlugin your@email
+TAVILY_API_KEY=tvly-...
+# 需要 Tushare/Longbridge/Finnhub/AlphaVantage 时再打开：
+# DATA_SOURCE_PROFILE=full
+EOF
+```
+
+- 每行一个 `KEY=VALUE`；空行和整行 `#` 注释会被忽略；支持 `export` 前缀和成对引号
+- **真实环境变量优先**：`launchctl`、CI、shell 里的值不会被文件覆盖
+- 工具是每次调用新起 Python 进程，所以改完文件**不用重启 DSH**；MCP server 是长驻进程，需要重启 MCP server/客户端
+- 文件不要放进仓库，权限建议 `600`
+- `tools/diagnostics.py check` 会显示文件路径、是否存在、权限是否过宽，但不会显示值
+
 ## 可选配置
 
 不配置任何环境变量也能使用。下面这些配置后会加入容灾链，或启用搜索、舆情和 SEC 数据：

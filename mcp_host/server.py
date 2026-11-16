@@ -19,6 +19,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+TOOLS_DIR = ROOT / "tools"
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from _credentials import load_credentials  # noqa: E402
+
+load_credentials()
+
 
 from hermes import _without_nulls, schemas, tools  # noqa: E402
 

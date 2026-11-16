@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _credentials import info as credentials_info  # noqa: E402
 from _subproc import utf8_stdio  # noqa: E402
 from capabilities import ALL_MARKETS  # noqa: E402
 
@@ -101,9 +102,16 @@ def diagnose(market: str = "all") -> dict:
             "freshness": "instant",
             "fallback_used": False,
             "warnings": [],
+            "credentials": credentials_info(),
         },
         "markets": [],
     }
+
+    credentials = result["meta"]["credentials"]
+    if credentials["exists"] and credentials["private"] is False:
+        result["meta"]["warnings"].append(
+            f"credentials file is group/world readable ({credentials['path']}); chmod 600 it"
+        )
 
     for m in markets_to_report:
         providers = [p for p in all_providers if m in p["markets"]]

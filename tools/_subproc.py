@@ -18,6 +18,18 @@ import threading
 from pathlib import Path
 
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
+try:
+    from _credentials import load_credentials
+except ImportError:  # runpy.run_path / host-owned "tools" namespace: load the sibling file
+    import importlib.util
+    from pathlib import Path as _Path
+
+    _spec = importlib.util.spec_from_file_location(
+        "_stock_analysis_credentials", _Path(__file__).with_name("_credentials.py")
+    )
+    _credentials_module = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_credentials_module)
+    load_credentials = _credentials_module.load_credentials
 
 
 COMMAND_BUDGETS = json.loads((Path(TOOLS_DIR) / "cli_budgets.json").read_text(encoding="utf-8"))
@@ -108,7 +120,9 @@ def run_tool(
 
 def utf8_stdio() -> None:
     """Force UTF-8 stdio. Windows defaults stdio to a legacy code page (cp1252)
-    that cannot encode the Chinese text these tools emit — call at CLI entry."""
+    that cannot encode the Chinese text these tools emit — call at CLI entry.
+    Also loads the local credential file before any tool reads a token."""
+    load_credentials()
     for s in (sys.stdout, sys.stderr):
         if hasattr(s, "reconfigure"):
             s.reconfigure(encoding="utf-8")

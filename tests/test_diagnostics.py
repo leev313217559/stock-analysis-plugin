@@ -147,3 +147,16 @@ if __name__ == "__main__":
 
     r = subprocess.run([sys.executable, "-m", "pytest", __file__, "-q"], cwd=os.path.dirname(os.path.dirname(__file__)))
     sys.exit(r.returncode)
+
+
+def test_diagnose_reports_credentials_file(monkeypatch, tmp_path):
+    path = tmp_path / "creds.env"
+    path.write_text("TUSHARE_TOKEN=test\n", encoding="utf-8")
+    path.chmod(0o600)
+    monkeypatch.setenv("STOCK_ANALYSIS_ENV_FILE", str(path))
+
+    result = diagnostics.diagnose("A")
+    credentials = result["meta"]["credentials"]
+    assert credentials["path"] == str(path)
+    assert credentials["exists"] is True
+    assert credentials["private"] is True

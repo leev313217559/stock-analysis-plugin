@@ -5,6 +5,8 @@ import socket
 # backstops). Production defaults to DATA_SOURCE_PROFILE=lean; profile selection is
 # covered by tests/test_source_profiles.py, which overrides this per test.
 os.environ.setdefault("DATA_SOURCE_PROFILE", "full")
+# Keep tests hermetic: never read the developer's real credential file.
+os.environ.setdefault("STOCK_ANALYSIS_ENV_FILE", os.devnull)
 
 import numpy as np
 import pandas as pd
