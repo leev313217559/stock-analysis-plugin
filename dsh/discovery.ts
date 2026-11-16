@@ -3,6 +3,17 @@ import { defineTool, type ToolRegistrationOptions } from "@deepseek-ai/dsh-tools
 import type {} from "@deepseek-ai/dsh-system-prompt";
 
 const SEARCH = "stock_tool_search";
+// High-frequency tools stay eager so a model mistake (searching the wrong name)
+// cannot turn a common quote/index request into "unknown tool". Everything else
+// remains search-gated.
+export const CORE_TOOLS = new Set([
+  "get_quote",
+  "get_kline",
+  "get_market_indices",
+  "get_market_stats",
+  "get_technical_analysis",
+  "get_news",
+]);
 
 // Returns the per-tool registration option; stock tools stay hidden per agent until searched.
 export function createToolDiscovery(ctx: Context): (tool: {name: string; description: string}) => ToolRegistrationOptions | undefined {
@@ -18,7 +29,7 @@ export function createToolDiscovery(ctx: Context): (tool: {name: string; descrip
   };
   ctx.tools.register(defineTool({
     name: SEARCH,
-    description: "搜索并加载股票分析工具；支持中文、英文关键词或确切工具名，如财务、get_quote、run_backtest。重要：调用任何股票工具前，必须先调用本工具加载目标工具；未加载的工具直接调用会返回 unknown tool。可一次搜索多个工具名（limit 最多 20），加载后在下一次模型请求按原名调用。不会执行分析或扩大权限。",
+    description: "搜索并加载股票分析工具；支持中文、英文关键词或确切工具名，如财务、get_quote、run_backtest。核心工具（get_quote/get_kline/get_market_indices/get_market_stats/get_technical_analysis/get_news）已常驻；其余工具调用前必须先调用本工具加载，未加载直接调用会返回 unknown tool。可一次搜索多个工具名（limit 最多 20），加载后在下一次模型请求按原名调用。不会执行分析或扩大权限。",
     parameters: {
       query: {type: "string", required: true, description: "工具名称或功能关键词"},
       limit: {type: "integer", description: "最多加载数量，默认5，范围1到20"},
@@ -69,6 +80,7 @@ export function createToolDiscovery(ctx: Context): (tool: {name: string; descrip
 
   return ({name, description}) => {
     names.set(name, description);
+    if (CORE_TOOLS.has(name)) return undefined;
     return {when: ({agent}) => !active(agent) || (loaded.get(agent)?.has(name) ?? false)};
   };
 }

@@ -8,6 +8,7 @@ import ToolRuntime, { defineTool } from "@deepseek-ai/dsh-tools";
 import * as NativeExecutor from "@deepseek-ai/dsh-tool-executor-native";
 import { ToolCallId } from "@deepseek-ai/dsh-llm";
 import * as stockPlugin from "../dsh/index.js";
+import { CORE_TOOLS } from "../dsh/discovery.js";
 
 const ctx = new Context();
 await ctx.plugin(SystemPrompt);
@@ -46,18 +47,24 @@ try {
     return JSON.parse(String(result.value));
   };
 
-  assert.deepEqual(await names(first), ["other_plugin", "stock_tool_search"]);
+  const initial = await names(first);
+  for (const name of ["other_plugin", "stock_tool_search", ...CORE_TOOLS]) {
+    assert(initial.includes(name), `core tool ${name} should be eager`);
+  }
+  assert(!initial.includes("get_financials"), "non-core tools stay search-gated");
   const disabledAtStartup = secondScope.ctx.tools.restrict({deny: ["stock_tool_search"]});
   assert((await names(second)).includes("get_quote"), "unavailable search at startup keeps stock tools exposed");
   disabledAtStartup();
-  assert.deepEqual(await names(second), ["other_plugin", "stock_tool_search"]);
+  assert((await names(second)).includes("get_quote"), "core tools stay eager after search is re-enabled");
   const found = await search(first, "get_quote", 1);
   assert.equal(found.loaded[0].name, "get_quote");
   assert.equal((await search(first, "stock quote", 1)).loaded[0].name, "get_quote", "a general stock keyword must not bury the requested quote capability");
   assert((await search(first, "股票回测")).loaded.some((tool: {name: string}) => tool.name === "run_backtest"), "Chinese capability terms must outrank generic stock characters");
   assert.equal((await search(first, "股票回测", 1)).loaded[0].name, "run_backtest", "generic backtest query must prefer the canonical tool");
-  assert((await names(first)).includes("get_quote"));
-  assert(!(await names(second)).includes("get_quote"), "loading must remain agent-local");
+  const financialsLoaded = await search(first, "get_financials", 1);
+  assert.equal(financialsLoaded.loaded[0].name, "get_financials");
+  assert((await names(first)).includes("get_financials"));
+  assert(!(await names(second)).includes("get_financials"), "loading must remain agent-local");
 
   firstScope.ctx.tools.restrict({deny: ["get_financials"]});
   const financials = await search(first, "财务");
@@ -77,7 +84,7 @@ try {
   assert(fallback.includes("run_backtest"), "disabled search must restore the stock catalog");
   assert(!fallback.includes("get_financials"), "fallback must preserve permission restrictions");
   blockSearch();
-  assert(!(await names(first)).includes("get_quote"), "re-enabled discovery starts with an empty loaded set");
+  assert(!(await names(first)).includes("get_financials"), "re-enabled discovery starts with an empty loaded set");
   const disposePtc = ctx.on("system-prompt/assemble", async (_assembly, _context, next) => {
     const assembly = await next();
     return {...assembly, sections: [...assembly.sections, {name: "tools:sdk", order: 0, text: "sdk", interpolate: false} as never]};
