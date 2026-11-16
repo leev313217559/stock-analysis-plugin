@@ -21,7 +21,7 @@ def test_full_profile_keeps_declared_chain(monkeypatch):
 
 def test_unknown_profile_falls_back_to_lean(monkeypatch):
     monkeypatch.setenv("DATA_SOURCE_PROFILE", "turbo")
-    chosen = sources.select("kline_a", _legs("akshare", "tushare", "efinance", "tencent", "baostock"))
+    chosen = sources.select("kline_a", _legs("akshare", "tushare", "efinance", "tencent"))
     assert [name for name, _ in chosen] == ["tencent", "akshare"]
 
 
@@ -66,8 +66,9 @@ def test_failover_uses_lean_chain(monkeypatch):
 
         return name, fn
 
-    assert stock_data._failover([leg("eastmoney", []), leg("baidu", [{"name": "hot"}])], "hot_stocks") is None
-    assert called == ["eastmoney"]
+    result = stock_data._failover([leg("eastmoney", []), leg("baidu", [{"name": "hot"}])], "hot_stocks")
+    assert called == ["eastmoney", "baidu"]
+    assert result == [{"name": "hot"}]
 
 
 def test_failover_full_profile_keeps_declared_order(monkeypatch):

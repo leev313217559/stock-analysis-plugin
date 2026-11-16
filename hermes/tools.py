@@ -329,10 +329,6 @@ def get_social_sentiment(args: dict, **kwargs) -> str:
     return _run("search_intel.py", ["sentiment", symbol])
 
 
-def get_trending_sentiment(args: dict, **kwargs) -> str:
-    return _run("search_intel.py", ["trending"])
-
-
 def extract_article(args: dict, **kwargs) -> str:
     url = args["url"]
     max_chars = args.get("max_chars", 3000)

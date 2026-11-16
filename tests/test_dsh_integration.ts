@@ -4,7 +4,7 @@
 // (defineTool is identity, so the options object is captured verbatim).
 // Verifies:
 //   - the plugin exports the cordis function-plugin form (name/inject/apply)
-//   - all 73 tools register, aligned with the canonical cross-host tool list
+//   - all 72 tools register, aligned with the canonical cross-host tool list
 //     (openclaw.plugin.json contracts.tools — the repo invariant says every
 //     host exposes the same set)
 //   - the dsh bundle manifest (package.json dsh.bundle.patch + cordis.patch.yml)
@@ -161,7 +161,7 @@ if (fundQuote) {
   assert(call.script.endsWith("stock_data.py") && JSON.stringify(call.args) === JSON.stringify(["fund_quote", "018147"]), "get_fund_quote: argv mismatch");
 }
 const quoteDescription = tools.find(t => t.name === "get_quote")!.description;
-for (const term of ["get_fund_quote", "TIAAxxxxxx", "投顾组合", "无统一净值", "official_disclosures", "partial", "advisor_org", "search_partial"]) {
+for (const term of ["get_fund_quote", "净值"]) {
   assert(quoteDescription.includes(term), `get_quote: description missing ${term}`);
 }
 
@@ -224,7 +224,6 @@ const sampleArgs: Record<string, Record<string, unknown>> = {
   search_stock_news: { query: "茅台" },
   search_comprehensive_intel: { symbol: "600519" },
   get_social_sentiment: { symbol: "AAPL" },
-  get_trending_sentiment: {},
   extract_article: { url: "https://example.com", max_chars: 20000 },
   screen_risk: { symbol: "600519" },
   detect_market_regime: {},

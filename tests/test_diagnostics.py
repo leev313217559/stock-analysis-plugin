@@ -140,10 +140,6 @@ class TestDiagnose:
         assert providers["tencent"]["reachable"] is None
         assert providers["sina"]["reachable"] is None
 
-    def test_baostock_is_listed_in_a_share_diagnostics(self):
-        providers = {p["name"] for p in diagnostics.diagnose("A")["markets"][0]["providers"]}
-        assert "baostock" in providers
-
 
 if __name__ == "__main__":
     import subprocess

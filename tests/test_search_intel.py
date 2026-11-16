@@ -6,12 +6,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tools.search_intel import _bocha_search, _searxng_search, extract_article, search_comprehensive, search_news
+from tools.search_intel import _searxng_search, extract_article, search_comprehensive, search_news
 
 
 @pytest.fixture(autouse=True)
 def no_external_search_credentials(monkeypatch):
-    for key in ("TAVILY_API_KEY", "BRAVE_API_KEY", "BOCHA_API_KEY", "SERPAPI_KEY", "SEARXNG_BASE_URLS"):
+    for key in ("TAVILY_API_KEY", "SEARXNG_BASE_URLS"):
         monkeypatch.delenv(key, raising=False)
 
 
@@ -78,76 +78,28 @@ class TestSearxngSearch:
             assert _searxng_search("query") == []
 
 
-class TestBochaSearch:
-    @patch.dict("os.environ", {}, clear=True)
-    def test_no_api_key_returns_empty(self):
-        assert _bocha_search("test query") == []
-
-    @patch.dict("os.environ", {"BOCHA_API_KEY": "k"})
-    def test_parses_bing_style_webpages_value(self):
-        # Real Bocha response: data.webPages.value[] (issue #13)
-        payload = {
-            "code": 200,
-            "data": {
-                "webPages": {
-                    "totalEstimatedMatches": 10000000,
-                    "value": [
-                        {"name": "T1", "url": "http://a.com/1", "snippet": "s1"},
-                        {"name": "T2", "url": "http://a.com/2", "snippet": None},
-                    ],
-                }
-            },
-        }
-        with patch.dict(sys.modules, {"requests": _mock_requests(payload)}):
-            results = _bocha_search("600519 最新消息")
-        assert len(results) == 2
-        assert results[0]["source"] == "bocha"
-        assert results[0]["title"] == "T1"
-        assert results[0]["url"] == "http://a.com/1"
-        assert results[0]["snippet"] == "s1"
-        # None snippet degrades to empty string, not a crash
-        assert results[1]["snippet"] == ""
-
-    @patch.dict("os.environ", {"BOCHA_API_KEY": "k"})
-    def test_http_error_raises_with_status(self):
-        mock_req = _mock_requests({}, ok=False, status_code=403)
-        with patch.dict(sys.modules, {"requests": mock_req}), pytest.raises(RuntimeError, match="403"):
-            _bocha_search("query")
-
-    @patch.dict("os.environ", {"BOCHA_API_KEY": "k"})
-    def test_body_code_error_raises(self):
-        # Bocha can signal failure via HTTP 200 + non-200 envelope code (e.g. quota)
-        payload = {"code": 403, "msg": "no quota"}
-        with (
-            patch.dict(sys.modules, {"requests": _mock_requests(payload)}),
-            pytest.raises(RuntimeError, match="no quota"),
-        ):
-            _bocha_search("query")
-
-
 class TestSearchNewsEngineErrors:
-    @patch.dict("os.environ", {"BOCHA_API_KEY": "k"}, clear=True)
+    @patch.dict("os.environ", {"SEARXNG_BASE_URLS": "http://sx:8080"}, clear=True)
     def test_engine_failure_recorded_in_engines_errors(self):
         mock_req = _mock_requests({}, ok=False, status_code=403)
         with patch.dict(sys.modules, {"requests": mock_req}):
             result = search_news("some query")
         assert result["results"] == []
-        assert "bocha" in result["engines_errors"]
-        assert "403" in result["engines_errors"]["bocha"]
-        # unconfigured engines produce no error entries
+        assert "searxng" in result["engines_errors"]
+        assert "403" in result["engines_errors"]["searxng"]
         assert "tavily" not in result["engines_errors"]
 
-    @patch.dict("os.environ", {"SERPAPI_KEY": "SECRET123"}, clear=True)
+    @patch.dict("os.environ", {"TAVILY_API_KEY": "SECRET123"}, clear=True)
     def test_error_message_scrubs_api_key(self):
         # requests connection errors embed the prepared URL — api_key must not leak
         mock_req = MagicMock()
-        mock_req.get.side_effect = Exception("Max retries exceeded with url: /search?api_key=SECRET123&q=x")
+        mock_req.post.side_effect = Exception("Max retries exceeded with url: /search?api_key=SECRET123&q=x")
         with patch.dict(sys.modules, {"requests": mock_req}):
             result = search_news("some query")
-        assert "serpapi" in result["engines_errors"]
-        assert "SECRET123" not in result["engines_errors"]["serpapi"]
+        assert "tavily" in result["engines_errors"]
+        assert "SECRET123" not in result["engines_errors"]["tavily"]
 
-    @patch.dict("os.environ", {"BOCHA_API_KEY": "k"}, clear=True)
+    @patch.dict("os.environ", {"SEARXNG_BASE_URLS": "http://sx:8080"}, clear=True)
     def test_note_says_engines_failed_not_unconfigured(self):
         mock_req = _mock_requests({}, ok=False, status_code=403)
         with patch.dict(sys.modules, {"requests": mock_req}):
@@ -156,13 +108,13 @@ class TestSearchNewsEngineErrors:
         assert "No search engines configured" not in result["note"]
         assert "engines_errors" in result["note"]
 
-    @patch.dict("os.environ", {"BOCHA_API_KEY": "k"}, clear=True)
+    @patch.dict("os.environ", {"SEARXNG_BASE_URLS": "http://sx:8080"}, clear=True)
     def test_comprehensive_surfaces_engines_errors(self):
         mock_req = _mock_requests({}, ok=False, status_code=403)
         with patch.dict(sys.modules, {"requests": mock_req}):
             result = search_comprehensive("600519", "贵州茅台")
-        assert result["engines_errors"]["bocha"]
-        assert "403" in result["engines_errors"]["bocha"]
+        assert result["engines_errors"]["searxng"]
+        assert "403" in result["engines_errors"]["searxng"]
 
 
 class TestSearchNewsSearxngFallback:
@@ -183,48 +135,38 @@ class TestSearchNewsSearxngFallback:
 
 
 def test_comprehensive_does_not_repeat_unavailable_engine_and_resets_next_call(monkeypatch):
-
-    monkeypatch.setenv("BOCHA_API_KEY", "fixture")
+    monkeypatch.setenv("SEARXNG_BASE_URLS", "http://sx:8080")
     mock_req = _mock_requests({}, ok=False, status_code=503)
     with patch.dict(sys.modules, {"requests": mock_req}):
         first = search_comprehensive("600519")
-        assert "bocha" in first["engines_errors"]
-        assert mock_req.post.call_count == 1
+        assert "searxng" in first["engines_errors"]
+        assert mock_req.get.call_count == 1
         search_news("new invocation")
-        assert mock_req.post.call_count == 2
+        assert mock_req.get.call_count == 2
 
 
 def test_search_requests_use_remaining_budget_and_reach_healthy_fallback(monkeypatch):
     from tools import search_intel
 
     clock = [0.0]
-    seen = []
     monkeypatch.setattr(search_intel._time, "monotonic", lambda: clock[0])
     monkeypatch.setenv("TAVILY_API_KEY", "fixture")
-    monkeypatch.setenv("BRAVE_API_KEY", "fixture")
-    monkeypatch.setenv("BOCHA_API_KEY", "fixture")
+    monkeypatch.setenv("SEARXNG_BASE_URLS", "http://sx:8080")
     req = MagicMock()
 
     def post(url, **kwargs):
-        seen.append(kwargs["timeout"])
-        if "tavily" in url:
-            clock[0] += 30
-            raise TimeoutError("slow")
-        return _mock_requests(
-            {"data": {"webPages": {"value": [{"url": "https://example.invalid", "name": "ok"}]}}}
-        ).post()
+        clock[0] += 30
+        raise TimeoutError("slow")
 
     def get(url, **kwargs):
-        seen.append(kwargs["timeout"])
-        clock[0] += 12
-        raise TimeoutError("slow")
+        return _mock_requests({"results": [{"title": "T", "url": "http://a.com", "content": "c"}]}).get()
 
     req.post.side_effect = post
     req.get.side_effect = get
     with patch.dict(sys.modules, {"requests": req}):
         result = search_news("fixture", 1)
-    assert seen == [15, 15, 3]
-    assert result["engines_used"] == ["bocha"]
+    assert result["engines_used"] == ["searxng"]
+    assert result["results"][0]["source"] == "searxng"
     assert search_intel._SEARCH_STATE.get() is None
 
 
@@ -251,8 +193,8 @@ def test_searxng_instances_share_search_budget(monkeypatch):
 
 @pytest.mark.parametrize("status", [200, 400])
 def test_comprehensive_retries_healthy_empty_or_query_specific_failure(monkeypatch, status):
-    monkeypatch.setenv("BOCHA_API_KEY", "fixture")
-    req = _mock_requests({"data": {"webPages": {"value": []}}}, ok=status == 200, status_code=status)
+    monkeypatch.setenv("TAVILY_API_KEY", "fixture")
+    req = _mock_requests({"results": []}, ok=status == 200, status_code=status)
     with patch.dict(sys.modules, {"requests": req}):
         result = search_comprehensive("600519")
     assert len(result["dimensions"]) == 6

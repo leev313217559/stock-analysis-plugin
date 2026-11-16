@@ -33,7 +33,7 @@ LEAN = {
     # individual flow when eastmoney rate-limited the shared runner IP.
     "fund_flow": ["eastmoney", "efinance"],
     "dragon_tiger": ["eastmoney", "sina"],
-    "hot_stocks": ["eastmoney"],
+    "hot_stocks": ["eastmoney", "baidu"],
     "margin_kline": ["akshare", "efinance"],
     # HK/US quotes and klines: keyless Tencent first, yfinance as the global backstop.
     "yf_quote_hk": ["tencent", "yfinance"],

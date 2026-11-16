@@ -13,7 +13,7 @@ from tools.stock_data import _kline_tencent
 def isolate_sources(monkeypatch, tmp_path):
     monkeypatch.setattr(stock_data, "_DATA_CACHE_DIR", tmp_path)
     monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
-    for name in ("akshare", "efinance", "tencent", "sina", "baostock"):
+    for name in ("akshare", "efinance", "tencent", "sina"):
         monkeypatch.setattr(stock_data, f"_kline_{name}", MagicMock(side_effect=ValueError("offline")))
 
 
@@ -176,8 +176,8 @@ def test_missing_or_invalid_factors_fail_over_without_using_raw_prices(monkeypat
         )
 
     monkeypatch.setattr("requests.post", post)
-    stock_data._kline_baostock.return_value = [{"close": 11}]
-    stock_data._kline_baostock.side_effect = None
+    stock_data._kline_efinance.return_value = [{"close": 11}]
+    stock_data._kline_efinance.side_effect = None
     stock_data._kline_sina.side_effect = None
     stock_data._kline_sina.return_value = [{"close": 22}]
     rows = stock_data.cmd_kline(Namespace(symbol="600519", period="daily", count=1))
@@ -185,7 +185,7 @@ def test_missing_or_invalid_factors_fail_over_without_using_raw_prices(monkeypat
     stock_data._kline_sina.assert_not_called()
     # The winning adjusted source stays preferred on the next call.
     assert stock_data.cmd_kline(Namespace(symbol="600519", period="daily", count=1))[0]["close"] == rows[0]["close"]
-    assert stock_data._kline_baostock.call_count == 2
+    assert stock_data._kline_efinance.call_count == 2
 
 
 @pytest.mark.parametrize("symbol", ["600519", "sh600519", "510300", "920001", "bj920001"])

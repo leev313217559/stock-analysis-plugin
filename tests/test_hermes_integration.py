@@ -159,7 +159,6 @@ EXPECTED_TOOLS = sorted(
         "search_stock_news",
         "search_comprehensive_intel",
         "get_social_sentiment",
-        "get_trending_sentiment",
         "extract_article",
         "screen_risk",
         "detect_market_regime",
@@ -251,13 +250,7 @@ def test_fund_quote_schema_and_cli_dispatch(monkeypatch):
     quote_description = next(row["description"] for row in TOOL_SCHEMAS if row["name"] == "get_quote")
     for term in [
         "get_fund_quote",
-        "TIAAxxxxxx",
-        "投顾组合",
-        "无统一净值",
-        "official_disclosures",
-        "partial",
-        "advisor_org",
-        "search_partial",
+        "净值",
     ]:
         assert term in quote_description, f"get_quote: description missing {term}"
     handler = getattr(hermes_tools, "get_fund_quote", None)

@@ -24,7 +24,7 @@
 - **策略视角**：缠论、波浪理论、龙头战法、情绪周期等 18 套方法论，以 Skill 形式按需调用。
 - **dsh 仪表盘**：在 dsh Web / Desktop 侧栏看自选股和六个市场的行情，后台预热，打开即显示。
 
-一共 73 个工具、21 个 Skills，11 个数据源自动容灾。大部分功能不需要任何 API Key。
+一共 72 个工具、21 个 Skills，按能力保留 2-3 个可靠源自动降级。大部分功能不需要任何 API Key。
 
 ## 快速开始
 
@@ -107,7 +107,7 @@
 | `LONGBRIDGE_ACCESS_TOKEN` | Longbridge SDK |
 | `ALPHAVANTAGE_API_KEY` | Alpha Vantage（美股 K 线 / 行情） |
 | `FINNHUB_API_KEY` | Finnhub（港股 / 美股） |
-| `XUEQIU_TOKEN` | 雪球（A 股个股所属板块反查，东财不可用时的兜底） |
+| `XUEQIU_TOKEN` | 雪球（A 股个股所属板块反查 + 讨论热度；值为登录后的 `xq_a_token`，会过期） |
 | `LIXINGER_TOKEN` | 理杏仁：指数 PB 与港股非金融公司财务、每日估值（需对应权限） |
 | `SEC_USER_AGENT` | SEC EDGAR 身份声明：应用名称与真实联系邮箱，13F / Form 4 必需 |
 
@@ -116,17 +116,7 @@
 | 环境变量 | 用途 |
 |---------|------|
 | `TAVILY_API_KEY` | Tavily 搜索 |
-| `BRAVE_API_KEY` | Brave 搜索 |
-| `SERPAPI_KEY` | SerpAPI |
-| `BOCHA_API_KEY` | Bocha AI 搜索 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例地址（逗号分隔多个，无需 Key，兜底用） |
-
-**社交舆情（可选）：**
-
-| 环境变量 | 用途 |
-|---------|------|
-| `SENTIMENT_API_URL` | 舆情 API 地址（默认 `https://api.adanos.org`） |
-| `SENTIMENT_API_KEY` | 舆情 API 密钥 |
 
 </details>
 
@@ -165,7 +155,7 @@
 
 ## 工具列表
 
-73 个工具按用途分组：
+72 个工具按用途分组：
 
 | 类别 | 数量 | 主要内容 |
 |------|------|----------|
@@ -178,7 +168,7 @@
 | 无状态研究与风险计算 | 8 | 同行比较、公告变更、组合风险、调仓计划、仓位计算、事件研究、回测稳健性 |
 
 <details>
-<summary>完整工具列表（73 个）</summary>
+<summary>完整工具列表（72 个）</summary>
 
 #### 数据获取
 
@@ -194,7 +184,7 @@
 | `get_etf_details` | A 股 ETF 净值折溢价、规模变动、披露持仓、可选基准成分与跟踪误差 |
 | `get_dividends` | A/HK/US/JP/KR/TW 历史分红与除息日历、已实现 TTM 股息；排行仍仅 A/HK |
 | `get_kline` | K 线数据（OHLCV），支持日/周/月线；A 股股票/ETF 前复权，每条记录 `adjusted=qfq`，指数 `adjusted=none` |
-| `get_quote` | 实时行情快照（非交易时段返回最近交易日收盘价并以 as_of/stale 标注；`pe_basis` 区分 dynamic/trailing/unknown；ETF 的 premium_discount_rate 为正=溢价、负=折价）；场外基金用 `get_fund_quote`，TIAAxxxxxx 返回投顾组合识别、`advisor_org` 与无统一净值提示；长钱/海外长钱/稳钱另有有知有行 `official_disclosures`（`partial=true`，非实时完整持仓）；其他组合搜索可用时为 `search_partial`，否则 `unsupported_provider` |
+| `get_quote` | 实时行情快照（非交易时段返回最近交易日收盘价并以 as_of/stale 标注；`pe_basis` 区分 dynamic/trailing/unknown；ETF 的 premium_discount_rate 为正=溢价、负=折价）；场外基金用 `get_fund_quote`（已披露净值，非实时价） |
 | `get_fund_quote` | 6 位场外公募基金净值；`nav` 是 `nav_date` 对应的已披露日终净值而非实时价，`accumulated_nav` 为累计净值、`change_pct` 为日涨跌幅；`estimated_nav` 可能为 `null`，QDII 净值可能滞后 1-2 交易日 |
 | `get_capital_flow` | 资金流向（仅 A 股） |
 | `get_news` | 个股相关新闻 |
@@ -248,8 +238,7 @@
 |------|------|
 | `search_stock_news` | 关键词搜索新闻 |
 | `search_comprehensive_intel` | 综合情报搜索 |
-| `get_social_sentiment` | 社交媒体情绪（A 股：东财股吧 + 雪球；美港股：Reddit / X / Polymarket） |
-| `get_trending_sentiment` | 社交媒体热门趋势聚合（Reddit / X / Polymarket） |
+| `get_social_sentiment` | 社交媒体情绪（仅 A 股：东财股吧 + 雪球；雪球需 `XUEQIU_TOKEN`） |
 | `extract_article` | 网页 / 公告 PDF 正文提取；`max_chars` 默认 3000、上限 200000，返回 `truncated` |
 
 #### 辅助
@@ -384,8 +373,6 @@ python tools/backtest.py run strategies/examples/rsi_oversold.yaml 600519 --star
 python tools/search_intel.py search "茅台 业绩"
 python tools/search_intel.py comprehensive 600519
 python tools/search_intel.py sentiment 600519
-python tools/search_intel.py sentiment AAPL
-python tools/search_intel.py trending
 
 # 风险筛查
 python tools/risk_screening.py screen 600519
@@ -428,7 +415,7 @@ python tools/sec_edgar.py holdings 0000320193 --mode issuer   # 发行人 CIK �
 运行 `pip install -r tools/requirements.txt`。使用 virtualenv / conda 时，确保 Agent 启动时用的是同一个 Python 环境。
 
 **A 股数据获取失败？**
-报价会依次尝试腾讯、akshare、tushare、efinance 和新浪，K 线另有 baostock 兜底。都失败时，检查网络、升级 akshare（`pip install --upgrade akshare`），或配置 `TUSHARE_TOKEN` 增加一个可靠数据源。
+lean 模式下报价优先腾讯 → 新浪，K 线腾讯 → 新浪 → akshare；全部失败时检查网络或升级 akshare。需要恢复上游完整降级链时设置 `DATA_SOURCE_PROFILE=full`。
 
 **港股 / 美股数据有延迟？**
 yfinance 免费数据通常延迟约 15 分钟。配置 Longbridge（`LONGBRIDGE_APP_KEY` 等）或 Finnhub（`FINNHUB_API_KEY`）可获得更实时的数据。
@@ -458,7 +445,7 @@ sort_order: "desc"
 npm install                                   # 同时构建仓库 .venv
 .venv/bin/python -m pytest -q                 # Python 单元测试（离线）
 npx tsc --noEmit                              # TypeScript 类型检查
-npx tsx tests/test_adapter_parity.ts          # 四个宿主的 73 个工具和参数映射一致
+npx tsx tests/test_adapter_parity.ts          # 四个宿主的 72 个工具和参数映射一致
 npm run build:openclaw && npm run build:dsh   # 构建 OpenClaw / dsh bundle
 ```
 
@@ -470,20 +457,20 @@ npm run build:openclaw && npm run build:dsh   # 构建 OpenClaw / dsh bundle
 ```
 stock-analysis/
 ├── pi/                              # Pi Agent Extension
-│   └── index.ts                     #   注册 73 个工具 + 21 个 skill
+│   └── index.ts                     #   注册 72 个工具 + 21 个 skill
 ├── hermes/                          # Hermes Agent Plugin
 │   ├── plugin.yaml                  #   插件清单
 │   ├── __init__.py                  #   register(ctx) 入口
 │   ├── schemas.py                   #   工具 JSON Schema 定义
-│   └── tools.py                     #   73 个 handler → subprocess 调 CLI
+│   └── tools.py                     #   72 个 handler → subprocess 调 CLI
 ├── openclaw/                        # OpenClaw Plugin
 │   ├── openclaw.plugin.json         #   manifest（contracts.tools）
 │   ├── package.json                 #   含 openclaw 块（pluginApi/SDK 版本）
-│   └── index.ts                     #   definePluginEntry + registerTool ×73
+│   └── index.ts                     #   definePluginEntry + registerTool ×72
 ├── dsh/                             # DeepSeek Harness (dsh) Plugin
 │   ├── cordis.patch.yml             #   bundle patch（insert 插件入口）
 │   ├── package.json                 #   dsh.bundle + dsh.client manifest
-│   ├── index.ts                     #   cordis apply(ctx) + defineTool ×73
+│   ├── index.ts                     #   cordis apply(ctx) + defineTool ×72
 │   ├── dashboard.ts                 #   后台预热缓存 + 快照/自选股 HTTP API 与持久化
 │   ├── client.ts                    #   侧栏入口 + 主面板 + 主题同步（编译为 dist/client.js）
 │   └── web/                         #   仪表盘页面（app.ts 编译为 dist/web/app.js）

@@ -92,94 +92,6 @@ def _tavily_search(query: str, max_results: int = 5) -> list[dict]:
     ]
 
 
-def _brave_search(query: str, count: int = 5) -> list[dict]:
-    api_key = os.environ.get("BRAVE_API_KEY")
-    if not api_key:
-        return []
-    import requests
-
-    resp = requests.get(
-        "https://api.search.brave.com/res/v1/web/search",
-        headers={"X-Subscription-Token": api_key, "Accept": "application/json"},
-        params={"q": query, "count": count},
-        timeout=_search_timeout(),
-    )
-    if not resp.ok:
-        raise _search_error(f"brave HTTP {resp.status_code}", resp.status_code)
-    data = resp.json()
-    return [
-        {
-            "title": r.get("title", ""),
-            "url": r.get("url", ""),
-            "snippet": r.get("description", "")[:200],
-            "source": "brave",
-        }
-        for r in data.get("web", {}).get("results", [])
-    ]
-
-
-def _serpapi_search(query: str, num: int = 5) -> list[dict]:
-    api_key = os.environ.get("SERPAPI_KEY")
-    if not api_key:
-        return []
-    import requests
-
-    resp = requests.get(
-        "https://serpapi.com/search",
-        params={
-            "api_key": api_key,
-            "q": query,
-            "num": num,
-            "engine": "google",
-        },
-        timeout=_search_timeout(),
-    )
-    if not resp.ok:
-        raise _search_error(f"serpapi HTTP {resp.status_code}", resp.status_code)
-    data = resp.json()
-    return [
-        {
-            "title": r.get("title", ""),
-            "url": r.get("link", ""),
-            "snippet": r.get("snippet", "")[:200],
-            "source": "serpapi",
-        }
-        for r in data.get("organic_results", [])
-    ]
-
-
-def _bocha_search(query: str, max_results: int = 5) -> list[dict]:
-    api_key = os.environ.get("BOCHA_API_KEY")
-    if not api_key:
-        return []
-    import requests
-
-    resp = requests.post(
-        "https://api.bochaai.com/v1/web-search",
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-        json={"query": query, "count": max_results},
-        timeout=_search_timeout(),
-    )
-    if not resp.ok:
-        raise _search_error(f"bocha HTTP {resp.status_code}", resp.status_code)
-    data = resp.json()
-    code = data.get("code")
-    if code is not None and str(code) != "200":
-        # Bocha can signal quota/auth failure via HTTP 200 + non-200 envelope code
-        raise _search_error(f"bocha code {code}: {data.get('msg') or data.get('message') or 'unknown'}", code)
-    # Bocha web-search returns Bing-style data.webPages.value[] (issue #13)
-    items = ((data.get("data") or {}).get("webPages") or {}).get("value") or []
-    return [
-        {
-            "title": item.get("name", ""),
-            "url": item.get("url", ""),
-            "snippet": (item.get("snippet") or "")[:200],
-            "source": "bocha",
-        }
-        for item in items
-    ]
-
-
 def _searxng_search(query: str, max_results: int = 5) -> list[dict]:
     """SearXNG self-hosted metasearch — no API key, quota-free fallback.
 
@@ -238,9 +150,6 @@ def search_news(query: str, max_results: int = 10, budget_seconds: int = 45) -> 
     with _search_budget(budget_seconds) as state:
         for name, fn in [
             ("tavily", _tavily_search),
-            ("brave", _brave_search),
-            ("bocha", _bocha_search),
-            ("serpapi", _serpapi_search),
             ("searxng", _searxng_search),
         ]:
             engines_tried.append(name)
@@ -350,7 +259,11 @@ def _eastmoney_guba_heat(symbol: str) -> dict:
 
 
 def _xueqiu_heat(symbol: str) -> dict:
-    """雪球讨论热度 (public API)."""
+    """雪球讨论热度. The endpoint needs a logged-in cookie; without
+    XUEQIU_TOKEN it answers 403, so skip the request entirely."""
+    token = os.environ.get("XUEQIU_TOKEN", "").strip()
+    if not token:
+        return {}
     try:
         import requests
 
@@ -359,7 +272,7 @@ def _xueqiu_heat(symbol: str) -> dict:
         resp = requests.get(
             "https://stock.xueqiu.com/v5/stock/hot_stock/info.json",
             params={"symbol": xq_symbol},
-            headers={"User-Agent": "Mozilla/5.0", "Cookie": "xq_a_token=placeholder"},
+            headers={"User-Agent": "Mozilla/5.0", "Cookie": f"xq_a_token={token}"},
             timeout=10,
         )
         if not resp.ok:
@@ -401,33 +314,11 @@ def get_social_sentiment(symbol: str) -> dict:
         xueqiu = _xueqiu_heat(symbol)
         if xueqiu:
             result["sources"]["xueqiu"] = xueqiu
-    else:
-        api_url = os.environ.get("SENTIMENT_API_URL", "https://api.adanos.org")
-        api_key = os.environ.get("SENTIMENT_API_KEY")
-
-        try:
-            import requests
-
-            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-
-            for source in ["reddit", "twitter", "polymarket"]:
-                try:
-                    resp = requests.get(f"{api_url}/sentiment/{source}/{symbol}", headers=headers, timeout=10)
-                    if resp.ok:
-                        result["sources"][source] = resp.json()
-                except Exception:
-                    pass
-        except ImportError:
-            result["error"] = "requests library not available"
-
     if not result["sources"]:
         if market == "A":
             result["note"] = "No A-share sentiment data available. 东方财富/雪球 APIs may be temporarily unavailable."
         else:
-            result["note"] = (
-                "No sentiment data available. Set SENTIMENT_API_URL and SENTIMENT_API_KEY, "
-                "or ensure the sentiment API is accessible."
-            )
+            result["note"] = "Social sentiment is A-share only (eastmoney guba + xueqiu)."
 
     result["additional_context"] = {
         "wisburg_mcp": "Use 'list-feed' and 'list-market-daily' MCP tools for institutional research context.",
@@ -437,42 +328,6 @@ def get_social_sentiment(symbol: str) -> dict:
 
 
 # --------------- Trending Aggregation ---------------
-
-
-def get_trending_sentiment() -> dict:
-    """Fetch trending sentiment from Reddit/X/Polymarket."""
-    api_url = os.environ.get("SENTIMENT_API_URL", "https://api.adanos.org")
-    api_key = os.environ.get("SENTIMENT_API_KEY")
-
-    result = {"trending": {}, "fetched_at": None}
-
-    try:
-        import requests
-
-        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-
-        for source in ["reddit", "twitter", "polymarket"]:
-            try:
-                resp = requests.get(f"{api_url}/trending/{source}", headers=headers, timeout=10)
-                if resp.ok:
-                    result["trending"][source] = resp.json()
-            except Exception:
-                pass
-    except ImportError:
-        result["error"] = "requests library not available"
-
-    if not result["trending"]:
-        result["note"] = "No trending data available. Set SENTIMENT_API_URL and SENTIMENT_API_KEY."
-
-    result["fetched_at"] = _time.strftime("%Y-%m-%d %H:%M:%S")
-    result["additional_context"] = {
-        "wisburg_mcp": "Use 'list-feed' for latest research feed and 'list-market-daily' for market daily digest.",
-    }
-
-    return result
-
-
-# --------------- Article Extraction ---------------
 
 
 def _extract_pdf(url: str, max_chars: int, response) -> dict:
@@ -576,10 +431,6 @@ def cmd_sentiment(args):
     return get_social_sentiment(args.symbol)
 
 
-def cmd_trending(args):
-    return get_trending_sentiment()
-
-
 def cmd_extract(args):
     return extract_article(args.url, max_chars=args.max_chars)
 
@@ -599,8 +450,6 @@ def main():
     p_sent = sub.add_parser("sentiment")
     p_sent.add_argument("symbol", help="Stock ticker (e.g. AAPL, 600519, 00700.HK)")
 
-    sub.add_parser("trending")
-
     p_ext = sub.add_parser("extract")
     p_ext.add_argument("url", help="Article or PDF URL to extract")
     p_ext.add_argument("--max-chars", type=int, default=3000, help="Maximum extracted characters (1-200000)")
@@ -614,7 +463,6 @@ def main():
         "search": cmd_search,
         "comprehensive": cmd_comprehensive,
         "sentiment": cmd_sentiment,
-        "trending": cmd_trending,
         "extract": cmd_extract,
     }
     result = dispatch[args.command](args)

@@ -56,7 +56,6 @@ const EXPECTED_TOOLS = [
   "search_stock_news",
   "search_comprehensive_intel",
   "get_social_sentiment",
-  "get_trending_sentiment",
   "extract_article",
   "screen_risk",
   "detect_market_regime",
@@ -234,7 +233,7 @@ if (fundQuote) {
   assert(calls.at(-1)![0].endsWith("stock_data.py") && JSON.stringify(calls.at(-1)!.slice(1)) === JSON.stringify(["fund_quote", "018147"]), "get_fund_quote: argv mismatch");
 }
 const quoteDescription = registeredTools.find(t => t.name === "get_quote")!.description;
-for (const term of ["get_fund_quote", "TIAAxxxxxx", "投顾组合", "无统一净值", "official_disclosures", "partial", "advisor_org", "search_partial"]) {
+for (const term of ["get_fund_quote", "净值"]) {
   assert(quoteDescription.includes(term), `get_quote: description missing ${term}`);
 }
 

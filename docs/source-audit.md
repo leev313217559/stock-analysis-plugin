@@ -1,7 +1,7 @@
 # Source audit and lean-profile decisions
 
-Status: **Phase 1 done** (lean/full profiles), **Phase 3 done** (contract fixtures),
-**Phase 2 pending decisions** (this document). Production defaults to
+Status: **Phase 1 done** (lean/full profiles), **Phase 2 done** (approved
+removals), **Phase 3 done** (contract fixtures). Production defaults to
 `DATA_SOURCE_PROFILE=lean`; `full` preserves every declared leg.
 
 ## What is external and uncontrollable
@@ -10,7 +10,7 @@ Status: **Phase 1 done** (lean/full profiles), **Phase 3 done** (contract fixtur
 |---|---|---|
 | Market data providers | tencent, sina, eastmoney (push2/datacenter/emweb), cninfo, csindex, legulegu, hkex, sse, szse, sec.gov, yfinance | keyless or account/cookie based; rename/rate-limit/HTML-challenge risk |
 | Keyed providers | tushare, longbridge, finnhub, alphavantage, lixinger, xueqiu | optional; fail fast when the key is absent |
-| Search/sentiment | tavily, brave, bocha, serpapi, searxng, adanos, eastmoney guba | key/self-host; RSS/JSON drift |
+| Search/sentiment | tavily, searxng, eastmoney guba, xueqiu | key/self-host; RSS/JSON drift |
 | Protocols | HTTP JSON, HTML/JS pages, MCP stdio, CLI stdout JSON, DSH tool schema, OpenAI-compatible API | own protocols are stable; third-party pages are not |
 | Runtimes/packages | Python 3.10/3.11, Node 24, akshare/yfinance/pandas, DSH/hosts | drift handled by compat shims + Dependabot |
 | Upstream code | Weaxs repository | merged, reviewed, never trusted blindly |
@@ -43,7 +43,25 @@ Status: **Phase 1 done** (lean/full profiles), **Phase 3 done** (contract fixtur
 - Portfolio metadata (`_quote_tiaa`) needs a real cookie too (400016 without).
 - Recommendation: keep Xueqiu as an optional token source, wire the heat leg to `XUEQIU_TOKEN`, and document that the cookie is account-scoped and expires.
 
-## Decisions needed
+## Phase 2 outcome (implemented 2026-11-16)
+
+- **baostock removed**: no longer in lean/full chains, code, diagnostics,
+  `tools/requirements.txt`, `pyproject.toml`, or tests.
+- **hot_stocks keeps baidu**: lean chain is `eastmoney → baidu`, so an eastmoney
+  throttle still has a keyless backstop.
+- **TIAA / youzhiyouxing removed**: `tiaa_disclosures.py` deleted, the TIAA quote
+  path and adapter descriptions dropped, tests removed.
+- **adanos removed**: HK/US social sentiment is now an explicit A-share-only note;
+  the `get_trending_sentiment` tool was removed everywhere (72 tools now).
+- **Search engines**: kept Tavily + SearXNG; Brave / Bocha / SerpAPI clients and
+  their env vars were removed.
+- **Xueqiu kept and wired**: `_xueqiu_heat` reads `XUEQIU_TOKEN` (skips the request
+  without it); industry fallback was already token-gated.
+- **Northbound** stays as a historical series with its existing disclosure note.
+- Verification: `pytest` 2169 passed; adapter parity 72 tools; DSH/Pi/OpenClaw
+  integration tests pass.
+
+## Decisions (resolved)
 
 1. Remove **baostock** (kline backstop)? Recommend yes.
 2. Keep **baidu** as the second hot-stocks leg, or accept eastmoney-only? Recommend keep baidu.

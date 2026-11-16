@@ -73,12 +73,8 @@ TOOL_MATRIX = {
     "get_margin_trading": {"markets": ["A"], "reason": "A-share only"},
     "get_northbound_flow": {"markets": ["A"], "reason": "A-share only"},
     "get_social_sentiment": {
-        "markets": ["A", "HK", "US"],
-        "reason": "A-share uses Eastmoney/Xueqiu; HK/US require SENTIMENT_API_KEY",
-    },
-    "get_trending_sentiment": {
-        "markets": ALL_MARKETS,
-        "reason": None,
+        "markets": ["A"],
+        "reason": "A-share only (eastmoney guba + xueqiu)",
     },
     # search-based, market-agnostic
     "search_stock_news": {"markets": ALL_MARKETS, "reason": None},

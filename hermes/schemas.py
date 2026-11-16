@@ -346,7 +346,7 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "get_quote",
-        "description": "获取股票实时行情报价（现价、涨跌幅、量比等）。支持A股、港股、美股、日股、韩股、台股；非交易时段返回最近交易日收盘价并以 as_of/stale 标注；ETF 的 premium_discount_rate 为正=溢价、负=折价。返回 source、UTC fetched_at 和提供方 data_as_of（未知为null）；as_of_basis区分提供方时间与交易日历推断，采集时间不等于行情时间。场外基金用 get_fund_quote；TIAAxxxxxx 返回投顾组合识别、advisor_org 与无统一净值提示；长钱/海外长钱/稳钱另有有知有行 official_disclosures（partial=true，非实时完整持仓）；其他组合搜索可用时为 search_partial，否则 unsupported_provider。",
+        "description": "获取股票实时行情报价（现价、涨跌幅、量比等）。支持A股、港股、美股、日股、韩股、台股；非交易时段返回最近交易日收盘价并以 as_of/stale 标注；ETF 的 premium_discount_rate 为正=溢价、负=折价。返回 source、UTC fetched_at 和提供方 data_as_of（未知为null）；as_of_basis区分提供方时间与交易日历推断，采集时间不等于行情时间。场外基金用 get_fund_quote；返回已披露净值（非实时价）。",
         "parameters": {
             "type": "object",
             "properties": {
@@ -933,7 +933,7 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "get_social_sentiment",
-        "description": "获取股票社交媒体情绪数据。A股：东方财富股吧热度+雪球讨论热度（无需配置）；美股/港股：Reddit/X/Polymarket情绪（需 SENTIMENT_API_KEY）。自动按市场选数据源。面向个股维度；全市场热门讨论用 get_trending_sentiment",
+        "description": "获取 A 股社交媒体情绪数据：东方财富股吧热度 + 雪球讨论热度（雪球需设置 XUEQIU_TOKEN）。仅支持 A 股。",
         "parameters": {
             "type": "object",
             "properties": {
@@ -943,14 +943,6 @@ TOOL_SCHEMAS = [
                 },
             },
             "required": ["symbol"],
-        },
-    },
-    {
-        "name": "get_trending_sentiment",
-        "description": "获取社交媒体热门趋势（Reddit/X/Polymarket热门股票讨论）。适用于发现市场热点；查个股情绪用 get_social_sentiment",
-        "parameters": {
-            "type": "object",
-            "properties": {},
         },
     },
     {
