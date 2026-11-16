@@ -14,6 +14,7 @@ interface Quote {
   high?: Numeric;
   low?: Numeric;
   prev_close?: Numeric;
+  volume?: Numeric;
   turnover?: Numeric;
   source?: string;
   as_of?: string;
@@ -59,6 +60,7 @@ interface IndexChart {
   turnover_unit?: string;
   source?: string;
   delayed?: boolean;
+  delay_minutes?: Numeric;
   as_of?: string;
   prev_close?: Numeric;
   intraday?: Intraday;
@@ -491,7 +493,23 @@ function renderRibbon() {
       }
       const chart = intradaySpark(row.chart?.intraday, 114, 22);
       if (chart) tile.append(chart);
-      if (row.chart?.delayed) tile.append(el("span", "delay-badge", "延迟"));
+      const meta = el("div", "tile-meta");
+      const quote = row.quote;
+      if (quote) {
+        if (num(quote.open) !== null) meta.append(el("span", "", `开 ${fmtPrice(quote.open, 2)}`));
+        if (num(quote.high) !== null) meta.append(el("span", "", `高 ${fmtPrice(quote.high, 2)}`));
+        if (num(quote.low) !== null) meta.append(el("span", "", `低 ${fmtPrice(quote.low, 2)}`));
+        const turnover = num(quote.turnover);
+        if (turnover !== null && turnover > 0) meta.append(el("span", "", `额 ${fmtAmount(turnover)}`));
+        else if (num(quote.volume) !== null) meta.append(el("span", "", `量 ${fmtAmount(quote.volume)}`));
+      }
+      if (meta.childElementCount) tile.append(meta);
+      if (row.chart?.delayed) {
+        const badge = el("span", "delay-badge tile-delay", "延迟");
+        const minutes = num(row.chart.delay_minutes);
+        badge.title = minutes ? `供应商延迟约 ${minutes} 分钟` : "供应商延迟，数据截至 " + (row.chart.as_of || "未知");
+        tile.append(badge);
+      }
       tiles.append(tile);
     }
     group.append(head, tiles);
@@ -872,16 +890,21 @@ function indexChartCard(row: IndexRow): HTMLElement {
   const head = el("div", "chart-head");
   const title = el("div", "chart-title");
   title.append(el("strong", "", INDEX_NAMES[row.code] || quote?.name || row.code), el("span", "chart-code", row.code));
+  const range = bars.length ? `${shortDate(bars[0].date)} – ${shortDate(bars[bars.length - 1].date)}` : "";
+  const sub = [chart?.as_of ? `数据截至 ${chart.as_of}` : "", range ? `区间 ${range}` : "", chart?.delayed ? "供应商延迟" : ""].filter(Boolean).join(" · ");
+  if (sub) title.append(el("span", "chart-meta", sub));
   head.append(title);
-  if (chart?.delayed) head.append(el("span", "delay-badge", "延迟"));
+  if (chart?.delayed) {
+    const badge = el("span", "delay-badge", "延迟");
+    const minutes = num(chart.delay_minutes);
+    badge.title = minutes ? `供应商延迟约 ${minutes} 分钟` : "供应商延迟，数据截至 " + (chart.as_of || "未知");
+    head.append(badge);
+  }
   const change = el("div", `chart-change ${dir(changePct)}`);
   change.append(el("strong", "", fmtPrice(price, 2)), el("span", "", fmtPct(changePct)));
   head.append(change);
   card.append(head);
 
-  const range = bars.length ? `${shortDate(bars[0].date)} – ${shortDate(bars[bars.length - 1].date)}` : "";
-  const sub = [chart?.as_of ? `数据截至 ${chart.as_of}` : "", range ? `区间 ${range}` : "", chart?.delayed ? "供应商延迟" : ""].filter(Boolean).join(" · ");
-  if (sub) card.append(el("p", "chart-sub", sub));
   if (chart) {
     const quoteTurnover = num(quote?.turnover);
     const turnover = num(last?.turnover) ?? (quoteTurnover !== null && quoteTurnover > 0 ? quoteTurnover : null);
@@ -942,25 +965,26 @@ function statsPanel(slot: Slot<Stats> | undefined): HTMLDivElement {
     return node;
   }
   const [up, flat, down] = statsCounts(stats);
-  const wide = el("div", "breadth-wide");
+  const row = el("div", "stats-inline");
+  const breadth = el("div", "breadth-inline");
   const legend = el("div", "breadth-legend");
-  legend.append(el("span", "up", `上涨 ${up}`), el("span", "flat", `平盘 ${flat}`), el("span", "down", `下跌 ${down}`));
-  wide.append(breadthBar(up, flat, down), legend);
-  const list = el("dl", "stats");
-  const rows: Array<[string, string | number, string]> = [
-    ["涨停", num(stats.limit_up_count) ?? "—", "up"],
-    ["跌停", num(stats.limit_down_count) ?? "—", "down"],
-    ["平均涨幅", fmtPct(stats.avg_change_pct), dir(stats.avg_change_pct)],
-    ["涨幅中位数", fmtPct(stats.median_change_pct), dir(stats.median_change_pct)],
-    ["总成交额", fmtAmount(stats.total_turnover), ""],
-    ["统计股票", num(stats.total_stocks) ?? up + flat + down, ""],
-  ];
-  for (const [label, value, cls] of rows) {
-    const item = el("div");
-    item.append(el("dt", "", label), el("dd", cls, value));
-    list.append(item);
-  }
-  node.append(wide, list);
+  legend.append(el("span", "up", `涨 ${up}`), el("span", "flat", `平 ${flat}`), el("span", "down", `跌 ${down}`));
+  breadth.append(breadthBar(up, flat, down), legend);
+  row.append(breadth);
+  const item = (label: string, value: string | number, cls = "") => {
+    const span = el("span", "stat-inline", `${label} `);
+    span.append(el("strong", cls, value));
+    return span;
+  };
+  row.append(
+    item("涨停", num(stats.limit_up_count) ?? "—", "up"),
+    item("跌停", num(stats.limit_down_count) ?? "—", "down"),
+    item("均涨", fmtPct(stats.avg_change_pct), dir(stats.avg_change_pct)),
+    item("中位", fmtPct(stats.median_change_pct), dir(stats.median_change_pct)),
+    item("总成交额", fmtAmount(stats.total_turnover)),
+    item("统计", num(stats.total_stocks) ?? up + flat + down),
+  );
+  node.append(row);
   return node;
 }
 
@@ -1027,13 +1051,9 @@ function renderMarket() {
     return;
   }
   const phase = snap.phases?.[state.region];
+  if (state.region === "cn") body.append(statsPanel(snap.stats));
   body.append(indexCharts(market, phase));
-  if (state.region === "cn") {
-    body.append(statsPanel(snap.stats));
-    body.append(sectorsPanel(snap.sectors));
-  } else {
-    body.append(sessionPanel(state.region, phase));
-  }
+  if (state.region !== "cn") body.append(sessionPanel(state.region, phase));
 }
 
 function render(flash = new Map<string, Direction>()) {

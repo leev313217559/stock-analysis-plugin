@@ -389,3 +389,16 @@ body.modal-open { overflow: hidden; }
   .chart-card { padding: 10px; }
   .chart-change strong { font-size: 16px; }
 }
+
+/* ---------- compact index tiles / stats row ---------- */
+.tile { width: 168px; position: relative; }
+.tile-name { padding-right: 38px; }
+.tile-meta { grid-column: 1 / -1; display: flex; gap: 4px 10px; flex-wrap: wrap; color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+.tile-meta span { font-variant-numeric: tabular-nums; }
+.tile-delay { position: absolute; top: 4px; right: 6px; }
+.chart-title { flex-wrap: wrap; }
+.chart-meta { color: var(--muted); font-size: 11px; font-weight: 400; }
+.stats-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 18px; padding: 2px 14px 10px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.breadth-inline { display: flex; align-items: center; gap: 8px; }
+.stats-inline .stat-inline strong { color: var(--text); font-weight: 600; }
+.stats-inline .breadth-legend { display: flex; gap: 8px; }

@@ -110,6 +110,7 @@ def _tencent_minute(symbol: str) -> dict:
         "turnover": last_turnover,
         "source": "tencent",
         "delayed": False,
+        "delay_minutes": 0,
     }
 
 
@@ -138,6 +139,7 @@ def _yf_minute(symbol: str) -> dict:
         "turnover": None,
         "source": "yfinance",
         "delayed": True,
+        "delay_minutes": 15,
     }
 
 
@@ -240,6 +242,7 @@ def build(symbol: str, days: int = 120) -> dict:
         "turnover_unit": meta["turnover_unit"],
         "source": history[-1].get("source") or intraday["source"],
         "delayed": bool(intraday.get("delayed")),
+        "delay_minutes": intraday.get("delay_minutes", 0),
         "as_of": f"{today} {intraday['points'][-1]['t']}" if today else None,
         "prev_close": prev,
         "intraday": {**intraday, "prev_close": prev},
