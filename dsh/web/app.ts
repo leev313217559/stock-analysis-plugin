@@ -970,12 +970,10 @@ function indexChartCard(row: IndexRow): HTMLElement {
   return card;
 }
 
-function indexCharts(market: Snapshot["market"], phase: Phase | null | undefined): HTMLDivElement {
-  const node = panel("指数走势", phaseNote(phase));
+function indexCharts(market: Snapshot["market"]): HTMLDivElement {
   const list = el("div", "chart-list");
   for (const row of market.indices) list.append(indexChartCard(row));
-  node.append(list);
-  return node;
+  return list;
 }
 
 function statsPanel(slot: Slot<Stats> | undefined): HTMLDivElement {
@@ -1038,24 +1036,24 @@ function sectorsPanel(slot: Snapshot["sectors"] | undefined): HTMLDivElement {
 }
 
 function sessionPanel(region: Region, phase: Phase | null | undefined): HTMLDivElement {
-  const node = panel("交易时段", "");
-  const body = el("div", "session");
-  const list = el("dl");
+  const node = el("div", "session-inline");
+  node.append(el("span", "session-label", `${REGION_NAMES[region]}交易时段`));
   const sessions = Array.isArray(phase?.sessions)
     ? phase.sessions.map(item => (Array.isArray(item) ? item.join("–") : "")).filter(Boolean).join(" / ")
     : "";
   const facts: Array<[string, string | undefined]> = [
     ["状态", phase?.phase_label],
-    ["当地时间", phase?.local_time?.replace("T", " ").slice(0, 16)],
+    ["当地", phase?.local_time?.replace("T", " ").slice(0, 16)],
     ["时区", phase?.timezone],
     ["时段", sessions],
   ];
   for (const [label, value] of facts) {
     if (!value) continue;
-    list.append(el("dt", "", label), el("dd", "", value));
+    const item = el("span", "session-item", `${label} `);
+    item.append(el("strong", "", value));
+    node.append(item);
   }
-  body.append(list);
-  node.append(body);
+  if (!facts.some(([, value]) => value)) node.append(el("span", "session-item", "暂无交易时段数据"));
   return node;
 }
 
@@ -1073,8 +1071,8 @@ function renderMarket() {
   }
   const phase = snap.phases?.[state.region];
   if (state.region === "cn") body.append(statsPanel(snap.stats));
-  body.append(indexCharts(market, phase));
-  if (state.region !== "cn") body.append(sessionPanel(state.region, phase));
+  body.append(indexCharts(market));
+  body.append(sessionPanel(state.region, phase));
 }
 
 function render(flash = new Map<string, Direction>()) {

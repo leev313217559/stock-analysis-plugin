@@ -402,3 +402,14 @@ body.modal-open { overflow: hidden; }
 .breadth-inline { display: flex; align-items: center; gap: 8px; }
 .stats-inline .stat-inline strong { color: var(--text); font-weight: 600; }
 .stats-inline .breadth-legend { display: flex; gap: 8px; }
+
+/* ---------- bare chart list + one-line session ---------- */
+.chart-list { padding: 0; }
+.session-inline {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px 16px;
+  min-height: 34px; padding: 7px 12px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--surface); color: var(--muted); font-size: 11.5px;
+}
+.session-inline .session-label { color: var(--text); font-weight: 650; }
+.session-inline .session-item { font-variant-numeric: tabular-nums; }
+.session-inline .session-item strong { color: var(--text); font-weight: 600; }
