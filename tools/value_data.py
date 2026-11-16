@@ -25,6 +25,16 @@ from trading_calendar import _MARKET_TZ, market_now
 YF_MARKETS = ("US", "JP", "KR", "TW")
 
 
+def index_hist_csindex(**kwargs):
+    """akshare renamed the CSI index history API; accept both old and new names."""
+    import akshare as ak
+
+    fetch = getattr(ak, "index_hist_csindex", None) or getattr(ak, "stock_zh_index_hist_csindex", None)
+    if fetch is None:
+        raise AttributeError("akshare provides no index_hist_csindex")
+    return fetch(**kwargs)
+
+
 def records(frame):
     if frame is None:
         raise ValueError("provider returned no dataset")
@@ -244,7 +254,7 @@ def index_valuation(args):
             "history",
             lambda: dataset(
                 f"csi-history:{code}:{args.years}",
-                lambda: ak.stock_zh_index_hist_csindex(
+                lambda: index_hist_csindex(
                     symbol=code, start_date=cutoff.replace("-", ""), end_date=_cn_now().date().strftime("%Y%m%d")
                 ),
             ),
@@ -1380,7 +1390,7 @@ def etf_details(args):
                 "benchmark_history",
                 lambda: dataset(
                     f"csi-close:{code}:{args.days}:{end.isoformat()}",
-                    lambda: ak.stock_zh_index_hist_csindex(
+                    lambda: index_hist_csindex(
                         symbol=code, start_date=start.strftime("%Y%m%d"), end_date=end.strftime("%Y%m%d")
                     ),
                 ),

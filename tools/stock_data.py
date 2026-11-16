@@ -2228,11 +2228,18 @@ def cmd_market_indices(args):
                 ("sh000016", "上证50"),
             ]
             results = []
+            # akshare 1.20.44 renamed the Sina index snapshot; tolerate both names.
+            spot_em = getattr(ak, "stock_zh_index_spot_em", None)
+            spot_sina = getattr(ak, "index_zh_spot_sina", None) or getattr(ak, "stock_zh_index_spot_sina", None)
             try:
-                df = _akshare_retry(ak.stock_zh_index_spot_em)
+                if spot_em is None:
+                    raise AttributeError("akshare has no stock_zh_index_spot_em")
+                df = _akshare_retry(spot_em)
             except Exception:
                 # eastmoney refuses datacenter/proxy IPs (RemoteDisconnected) — sina is the fallback
-                df = _akshare_retry(ak.stock_zh_index_spot_sina)
+                if spot_sina is None:
+                    raise
+                df = _akshare_retry(spot_sina)
             for code, name in indices:
                 clean_code = code[2:] if code[:2] in ("sh", "sz") else code
                 row = df[df["代码"] == clean_code]
