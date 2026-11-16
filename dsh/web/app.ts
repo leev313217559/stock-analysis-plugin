@@ -1054,7 +1054,7 @@ function sessionPanel(region: Region, phase: Phase | null | undefined): HTMLDivE
     if (!value) continue;
     list.append(el("dt", "", label), el("dd", "", value));
   }
-  body.append(list, el("p", "", `全市场涨跌分布与行业排行目前只有 A 股数据，${REGION_NAMES[region]}暂不提供，不用指数涨跌代替。`));
+  body.append(list);
   node.append(body);
   return node;
 }
