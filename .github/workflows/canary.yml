@@ -1,0 +1,118 @@
+name: canary
+
+on:
+  schedule:
+    # 00:30 UTC = 08:30 Asia/Shanghai, weekdays (before the A-share open).
+    - cron: "30 0 * * 1-5"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/canary.yml"
+      - "scripts/healthcheck.py"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r tools/requirements.txt
+
+      - name: Run healthcheck
+        run: |
+          set +e
+          python scripts/healthcheck.py --json --out healthcheck.json > healthcheck.stdout 2> healthcheck.stderr
+          code=$?
+          cat healthcheck.stderr
+          echo "exit=$code"
+          exit 0
+
+      - name: Evaluate report
+        id: eval
+        run: |
+          python - <<'PY'
+          import json, os
+          report = json.load(open("healthcheck.json"))
+          fails = [c for c in report["checks"] if c["status"] == "fail"]
+          warns = [c for c in report["checks"] if c["status"] == "warn"]
+          lines = ["| check | status | detail |", "|---|---|---|"]
+          for c in report["checks"]:
+              detail = json.dumps(c["detail"], ensure_ascii=False)[:160]
+              lines.append(f"| {c['name']} | {c['status']} | {detail} |")
+          summary = "\n".join(lines)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+              fh.write(f"## canary: {report['status']}\n\n{summary}\n")
+          with open("/tmp/canary-table.md", "w", encoding="utf-8") as fh:
+              fh.write(summary + "\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"failed={len(fails)}\nwarned={len(warns)}\nstatus={report['status']}\n")
+          print(f"status={report['status']} failed={len(fails)} warned={len(warns)}")
+          PY
+
+      - name: Open or update canary issue
+        if: steps.eval.outputs.failed != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json, os
+          report = json.load(open("healthcheck.json"))
+          table = open("/tmp/canary-table.md", encoding="utf-8").read()
+          bad = [c for c in report["checks"] if c["status"] == "fail"]
+          lines = [
+              "每日数据源体检发现硬失败，开盘前需要处理。",
+              "",
+              f"- 时间：{report['started_at']}",
+              f"- 版本：{json.dumps(report['versions'], ensure_ascii=False)}",
+              f"- 失败 {len(bad)} 项，告警 {report['summary']['warn']} 项",
+              "",
+              table,
+              "",
+              "排查顺序：改名/AttributeError → 补 `_ak_any`；限流/WAF → 换源或退避；列名变化 → 适配 + 回归测试。",
+          ]
+          open("/tmp/issue.md", "w", encoding="utf-8").write("\n".join(lines) + "\n")
+          PY
+          NUM="$(gh issue list --state open --search '"[canary]" in:title' --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          if [ -n "$NUM" ]; then
+            gh issue comment "$NUM" --body-file /tmp/issue.md
+            echo "commented on #$NUM"
+          else
+            gh issue create --title "[canary] 数据源体检失败 $(date -u +%F)" --body-file /tmp/issue.md
+          fi
+
+      - name: Close issue on recovery
+        if: steps.eval.outputs.failed == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NUMBERS="$(gh issue list --state open --search '"[canary]" in:title' --json number --jq '.[].number // empty' 2>/dev/null || true)"
+          if [ -z "$NUMBERS" ]; then
+            echo "no open canary issue"
+            exit 0
+          fi
+          for NUM in $NUMBERS; do
+            gh issue close "$NUM" --comment "canary 已恢复：${GITHUB_RUN_ID}"
+          done
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: canary-report
+          path: |
+            healthcheck.json
+            healthcheck.stdout
+            healthcheck.stderr
+          if-no-files-found: ignore
