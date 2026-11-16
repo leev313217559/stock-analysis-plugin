@@ -455,7 +455,6 @@ function groupByRegion(list: IndexRow[]): Map<Region, IndexRow[]> {
 
 function attachHoverTip(node: HTMLElement, text: string) {
   node.removeAttribute("title");
-  node.style.cursor = "help";
   const update = (event: PointerEvent) => {
     const tip = $("tip");
     tip.textContent = text;
