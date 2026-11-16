@@ -26,7 +26,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PY = sys.executable
 
-RATE_LIMIT_MARKERS = (
+# Transient upstream conditions: rate limits, proxy/CDN challenge pages, and
+# gateways that answer with HTML instead of JSON. These warn instead of failing
+# so a shared runner IP being throttled does not page anyone.
+TRANSIENT_MARKERS = (
     "限流",
     "RateLimit",
     "Push2RateLimit",
@@ -35,6 +38,15 @@ RATE_LIMIT_MARKERS = (
     "timed out",
     "Timeout",
     "rate limit",
+    "Expecting value",
+    "Expecting property name",
+    "JSONDecodeError",
+    "Unexpected token",
+    "502 Bad Gateway",
+    "503 Service",
+    "504 Gateway",
+    "Connection reset",
+    "ProxyError",
 )
 
 
@@ -60,7 +72,7 @@ def _error_status(data):
     """Return (status, message) for a CLI error payload, or None."""
     if isinstance(data, dict) and data.get("error"):
         message = str(data["error"])
-        if any(marker in message for marker in RATE_LIMIT_MARKERS):
+        if any(marker in message for marker in TRANSIENT_MARKERS):
             return "warn", message
         return "fail", message
     return None
@@ -232,6 +244,11 @@ def package_versions() -> dict:
     return versions
 
 
+def _is_transient(entry: dict) -> bool:
+    detail = json.dumps(entry.get("detail", {}), ensure_ascii=False)
+    return any(marker in detail for marker in TRANSIENT_MARKERS)
+
+
 def run_one(name: str, script: str, argv: list[str], validator, timeout: int) -> dict:
     started = time.monotonic()
     entry = {"name": name, "status": "fail", "detail": {}, "duration_s": 0.0}
@@ -288,6 +305,9 @@ def main() -> int:
         if selected is not None and name not in selected:
             continue
         entry = run_one(name, script, argv, validator, timeout)
+        if entry["status"] == "fail" and _is_transient(entry):
+            time.sleep(3)
+            entry = run_one(name, script, argv, validator, timeout)
         results.append(entry)
         print(f"[{entry['status']:4}] {name:15} {entry['duration_s']:6.2f}s {entry['detail']}", file=sys.stderr)
 
