@@ -639,7 +639,7 @@ function emptyRow(): HTMLTableRowElement {
   const row = el("tr");
   const cell = el("td", "empty");
   cell.colSpan = 8;
-  cell.append(el("strong", "", "还没有自选股"), el("p", "", "添加 600519、00700.HK 或 AAPL 这样的代码，价格和 30 日走势会在后台持续更新。"));
+  cell.append(el("strong", "", "还没有自选股"), el("p", "", "添加 600519、00700.HK 或 AAPL 这样的代码，价格和 120 日走势会在后台持续更新。"));
   const button = el("button", "btn primary", "添加自选");
   button.type = "button";
   button.dataset.action = "open-add";

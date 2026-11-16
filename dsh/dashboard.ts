@@ -472,7 +472,7 @@ export function createDashboardHandler(options: DashboardOptions): DashboardHand
     return {
       key: `trend:${symbol}`, kind: "trend", region, priority,
       // Yahoo-backed regions regularly need 20-30 s from mainland networks.
-      run: async () => trendRows(await py("stock_data.py", ["kline", symbol, "--period", "daily", "--count", "30"], region === "cn" ? 20_000 : 40_000)),
+      run: async () => trendRows(await py("stock_data.py", ["kline", symbol, "--period", "daily", "--count", "120"], region === "cn" ? 20_000 : 40_000)),
     };
   }
 

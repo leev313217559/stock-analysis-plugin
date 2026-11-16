@@ -275,7 +275,7 @@ try {
       "stock_data.py:quote AAPL",
       "stock_data.py:quote sh000001",
       "stock_data.py:market_indices --region hk",
-      "stock_data.py:kline 600519 --period daily --count 30",
+      "stock_data.py:kline 600519 --period daily --count 120",
       "index_chart.py:^HSI --days 120",
       "stock_data.py:sector_rankings --top 5 --direction both --board-type industry",
       "stock_data.py:market_stats",
@@ -283,8 +283,8 @@ try {
     ]) assert(py.calls.includes(expected), `missing ${expected}`);
     assert(!py.calls.includes("stock_data.py:market_indices --region cn"), "A-share indices use direct quotes");
     assert.equal(py.timeouts.get("stock_data.py:market_stats"), 130_000);
-    assert.equal(py.timeouts.get("stock_data.py:kline 600519 --period daily --count 30"), 20_000);
-    assert.equal(py.timeouts.get("stock_data.py:kline AAPL --period daily --count 30"), 40_000, "Yahoo-backed klines get a longer budget");
+    assert.equal(py.timeouts.get("stock_data.py:kline 600519 --period daily --count 120"), 20_000);
+    assert.equal(py.timeouts.get("stock_data.py:kline AAPL --period daily --count 120"), 40_000, "Yahoo-backed klines get a longer budget");
 
     const out = await call(handler, get("/stock-analysis/api/snapshot?region=hk&script=evil.py&argv=bad"));
     assert.equal(out.status(), 200);
