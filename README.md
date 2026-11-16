@@ -94,22 +94,23 @@
 
 打开左侧栏「**股票仪表盘**」→ 右上角齿轮「**设置**」→ 直接编辑文件内容 → 保存。保存后下一次工具调用生效，**不用重启 DSH**。
 
-配置文件固定在：
+配置文件（本机实际路径）：
 
 ```text
-$DSH_HOME/stock-analysis.env
-# 未设置 DSH_HOME 时：~/.dsh/stock-analysis.env
+~/.dsh/stock-analysis.env
 ```
 
-数据统一在：
+数据目录（本机实际路径）：
 
 ```text
-$DSH_HOME/stock-analysis/
+~/.dsh/stock-analysis/
 ├── watchlist.json
 ├── cache/
 ├── signals.jsonl
 └── reviews.jsonl
 ```
+
+如果设置了 `DSH_HOME`，把上面的 `~/.dsh` 换成 `$DSH_HOME` 即可；本机 `DSH_HOME` 就是 `~/.dsh`，所以两种写法指向同一个目录。
 
 编辑规则：
 
