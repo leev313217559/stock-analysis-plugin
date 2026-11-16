@@ -295,6 +295,14 @@ def _xueqiu_heat(symbol: str) -> dict:
 # --------------- Social Sentiment (market-aware) ---------------
 
 
+def _adanos_ticker(symbol: str) -> str:
+    """Adanos stock endpoints take US tickers and zero-padded HK numeric codes."""
+    upper = symbol.strip().upper()
+    if upper.endswith(".HK"):
+        return upper[:-3].lstrip("0").zfill(4)
+    return upper
+
+
 def get_social_sentiment(symbol: str) -> dict:
     """Market-aware social sentiment. A-shares: eastmoney + xueqiu. US/HK: Reddit/X/Polymarket."""
     result = {"symbol": symbol, "sources": {}}
@@ -315,31 +323,34 @@ def get_social_sentiment(symbol: str) -> dict:
         if xueqiu:
             result["sources"]["xueqiu"] = xueqiu
     else:
-        api_url = os.environ.get("SENTIMENT_API_URL", "https://api.adanos.org")
+        api_url = os.environ.get("SENTIMENT_API_URL", "https://api.adanos.org").rstrip("/")
         api_key = os.environ.get("SENTIMENT_API_KEY")
 
-        try:
-            import requests
+        if not api_key:
+            result["note"] = "SENTIMENT_API_KEY not set; HK/US sentiment skipped."
+        else:
+            try:
+                import requests
 
-            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-
-            for source in ["reddit", "twitter", "polymarket"]:
-                try:
-                    resp = requests.get(f"{api_url}/sentiment/{source}/{symbol}", headers=headers, timeout=10)
-                    if resp.ok:
-                        result["sources"][source] = resp.json()
-                except Exception:
-                    pass
-        except ImportError:
-            result["error"] = "requests library not available"
+                headers = {"X-API-Key": api_key}
+                ticker = _adanos_ticker(symbol)
+                result["ticker"] = ticker
+                for source in ("reddit", "x", "polymarket"):
+                    try:
+                        resp = requests.get(f"{api_url}/{source}/stocks/v1/stock/{ticker}", headers=headers, timeout=10)
+                        if resp.ok:
+                            result["sources"][source] = resp.json()
+                    except Exception:
+                        pass
+            except ImportError:
+                result["error"] = "requests library not available"
 
     if not result["sources"]:
         if market == "A":
             result["note"] = "No A-share sentiment data available. 东方财富/雪球 APIs may be temporarily unavailable."
-        else:
+        elif "note" not in result:
             result["note"] = (
-                "No sentiment data available. Set SENTIMENT_API_URL and SENTIMENT_API_KEY, "
-                "or ensure the sentiment API is accessible."
+                "No sentiment data available. Check SENTIMENT_API_KEY and that SENTIMENT_API_URL is reachable."
             )
 
     result["additional_context"] = {
@@ -353,29 +364,31 @@ def get_social_sentiment(symbol: str) -> dict:
 
 
 def get_trending_sentiment() -> dict:
-    """Fetch trending sentiment from Reddit/X/Polymarket."""
-    api_url = os.environ.get("SENTIMENT_API_URL", "https://api.adanos.org")
+    """Fetch trending sentiment from the adanos Reddit/X/Polymarket endpoints."""
+    api_url = os.environ.get("SENTIMENT_API_URL", "https://api.adanos.org").rstrip("/")
     api_key = os.environ.get("SENTIMENT_API_KEY")
 
     result = {"trending": {}, "fetched_at": None}
 
-    try:
-        import requests
+    if not api_key:
+        result["note"] = "SENTIMENT_API_KEY not set; trending sentiment skipped."
+    else:
+        try:
+            import requests
 
-        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+            headers = {"X-API-Key": api_key}
+            for source in ("reddit", "x", "polymarket"):
+                try:
+                    resp = requests.get(f"{api_url}/{source}/stocks/v1/trending", headers=headers, timeout=10)
+                    if resp.ok:
+                        result["trending"][source] = resp.json()
+                except Exception:
+                    pass
+        except ImportError:
+            result["error"] = "requests library not available"
 
-        for source in ["reddit", "twitter", "polymarket"]:
-            try:
-                resp = requests.get(f"{api_url}/trending/{source}", headers=headers, timeout=10)
-                if resp.ok:
-                    result["trending"][source] = resp.json()
-            except Exception:
-                pass
-    except ImportError:
-        result["error"] = "requests library not available"
-
-    if not result["trending"]:
-        result["note"] = "No trending data available. Set SENTIMENT_API_URL and SENTIMENT_API_KEY."
+    if not result["trending"] and "note" not in result:
+        result["note"] = "No trending data available. Check SENTIMENT_API_KEY and the adanos API."
 
     result["fetched_at"] = _time.strftime("%Y-%m-%d %H:%M:%S")
     result["additional_context"] = {

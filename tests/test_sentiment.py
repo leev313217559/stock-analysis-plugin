@@ -108,16 +108,31 @@ class TestGetSocialSentimentMarketDetection:
         mock_xueqiu.assert_called_once_with("600519")
 
     @patch("requests.get")
-    def test_us_stock_routes_to_adanos(self, mock_get):
+    def test_us_stock_routes_to_adanos(self, mock_get, monkeypatch):
+        monkeypatch.setenv("SENTIMENT_API_KEY", "test-key")
         mock_get.return_value = MagicMock(ok=True, json=lambda: {"score": 0.8})
         result = get_social_sentiment("AAPL")
-        assert "reddit" in result["sources"] or "twitter" in result["sources"] or "polymarket" in result["sources"]
+        assert {"reddit", "x", "polymarket"} <= set(result["sources"])
+        urls = [call.args[0] for call in mock_get.call_args_list]
+        assert "https://api.adanos.org/reddit/stocks/v1/stock/AAPL" in urls
+        assert mock_get.call_args_list[0].kwargs["headers"] == {"X-API-Key": "test-key"}
 
     @patch("requests.get")
-    def test_hk_stock_routes_to_adanos(self, mock_get):
+    def test_hk_stock_routes_to_adanos(self, mock_get, monkeypatch):
+        monkeypatch.setenv("SENTIMENT_API_KEY", "test-key")
         mock_get.return_value = MagicMock(ok=True, json=lambda: {"score": 0.7})
         result = get_social_sentiment("0700.HK")
         assert "eastmoney_guba" not in result["sources"]
+        urls = [call.args[0] for call in mock_get.call_args_list]
+        assert "https://api.adanos.org/reddit/stocks/v1/stock/0700" in urls
+
+    @patch("requests.get")
+    def test_without_key_skips_adanos(self, mock_get, monkeypatch):
+        monkeypatch.delenv("SENTIMENT_API_KEY", raising=False)
+        result = get_social_sentiment("AAPL")
+        assert result["sources"] == {}
+        assert "SENTIMENT_API_KEY not set" in result["note"]
+        mock_get.assert_not_called()
 
     @patch("tools.search_intel._xueqiu_heat")
     @patch("tools.search_intel._eastmoney_guba_heat")
@@ -140,20 +155,26 @@ class TestGetSocialSentimentMarketDetection:
 
 class TestTrendingSentiment:
     @patch("requests.get")
-    def test_fetches_all_sources(self, mock_get):
+    def test_fetches_all_sources(self, mock_get, monkeypatch):
+        monkeypatch.setenv("SENTIMENT_API_KEY", "test-key")
         mock_get.return_value = MagicMock(ok=True, json=lambda: [{"ticker": "AAPL", "buzz": 95}])
         result = get_trending_sentiment()
         assert "trending" in result
         assert "fetched_at" in result
-        assert mock_get.call_count == 3  # reddit, twitter, polymarket
+        assert mock_get.call_count == 3
+        urls = [call.args[0] for call in mock_get.call_args_list]
+        assert "https://api.adanos.org/reddit/stocks/v1/trending" in urls
+        assert all(call.kwargs["headers"] == {"X-API-Key": "test-key"} for call in mock_get.call_args_list)
 
     @patch("requests.get")
-    def test_api_failure_returns_note(self, mock_get):
+    def test_api_failure_returns_note(self, mock_get, monkeypatch):
+        monkeypatch.setenv("SENTIMENT_API_KEY", "test-key")
         mock_get.side_effect = Exception("network error")
         result = get_trending_sentiment()
         assert "note" in result
 
-    def test_wisburg_context_present(self):
+    def test_wisburg_context_present(self, monkeypatch):
+        monkeypatch.setenv("SENTIMENT_API_KEY", "test-key")
         with patch("requests.get", return_value=MagicMock(ok=True, json=lambda: [])):
             result = get_trending_sentiment()
         assert "additional_context" in result
