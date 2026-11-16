@@ -453,6 +453,25 @@ function groupByRegion(list: IndexRow[]): Map<Region, IndexRow[]> {
   return groups;
 }
 
+function attachHoverTip(node: HTMLElement, text: string) {
+  node.removeAttribute("title");
+  node.style.cursor = "help";
+  const update = (event: PointerEvent) => {
+    const tip = $("tip");
+    tip.textContent = text;
+    tip.hidden = false;
+    const left = Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, event.clientX - tip.offsetWidth / 2));
+    const top = event.clientY + 14 + tip.offsetHeight > window.innerHeight - 8
+      ? event.clientY - tip.offsetHeight - 10
+      : event.clientY + 14;
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  };
+  node.addEventListener("pointerenter", update);
+  node.addEventListener("pointermove", update);
+  node.addEventListener("pointerleave", () => { $("tip").hidden = true; });
+}
+
 function renderRibbon() {
   const track = $("ribbon");
   track.replaceChildren();
@@ -506,9 +525,10 @@ function renderRibbon() {
       }
       if (meta.childElementCount) tile.append(meta);
       if (row.chart?.delayed) {
-        const badge = el("span", "delay-badge tile-delay", "延迟");
         const minutes = num(row.chart.delay_minutes);
-        badge.title = minutes ? `供应商延迟约 ${minutes} 分钟` : "供应商延迟，数据截至 " + (row.chart.as_of || "未知");
+        const badge = el("span", "delay-badge tile-delay", minutes !== null ? `延迟 ${minutes}m` : "延迟");
+        const detail = minutes !== null ? `供应商延迟约 ${minutes} 分钟` : "供应商延迟";
+        attachHoverTip(badge, row.chart.as_of ? `${detail}，数据截至 ${row.chart.as_of}` : detail);
         tile.append(badge);
       }
       tiles.append(tile);
@@ -896,9 +916,10 @@ function indexChartCard(row: IndexRow): HTMLElement {
   if (sub) title.append(el("span", "chart-meta", sub));
   head.append(title);
   if (chart?.delayed) {
-    const badge = el("span", "delay-badge", "延迟");
     const minutes = num(chart.delay_minutes);
-    badge.title = minutes ? `供应商延迟约 ${minutes} 分钟` : "供应商延迟，数据截至 " + (chart.as_of || "未知");
+    const badge = el("span", "delay-badge", minutes !== null ? `延迟 ${minutes}m` : "延迟");
+    const detail = minutes !== null ? `供应商延迟约 ${minutes} 分钟` : "供应商延迟";
+    attachHoverTip(badge, chart.as_of ? `${detail}，数据截至 ${chart.as_of}` : detail);
     head.append(badge);
   }
   const change = el("div", `chart-change ${dir(changePct)}`);
