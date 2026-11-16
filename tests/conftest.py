@@ -4,6 +4,22 @@ import numpy as np
 import pandas as pd
 import pytest
 
+# akshare < 1.20.44 (the version Python 3.10 resolves in CI) exposes only the
+# legacy CSI index names. Alias them to the canonical names so tests patch one
+# API surface across interpreter versions; production resolves both via _ak_any.
+try:
+    import akshare as _akshare
+except Exception:  # pragma: no cover - akshare is a hard dependency in practice
+    _akshare = None
+
+if _akshare is not None:
+    for _new, _old in (
+        ("index_hist_csindex", "stock_zh_index_hist_csindex"),
+        ("index_value_csindex", "stock_zh_index_value_csindex"),
+    ):
+        if not hasattr(_akshare, _new) and hasattr(_akshare, _old):
+            setattr(_akshare, _new, getattr(_akshare, _old))
+
 
 @pytest.fixture
 def make_kline_data():
