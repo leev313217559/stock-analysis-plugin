@@ -1,4 +1,10 @@
+import os
 import socket
+
+# The upstream suite encodes the full provider chains (keyed legs, efinance/baidu
+# backstops). Production defaults to DATA_SOURCE_PROFILE=lean; profile selection is
+# covered by tests/test_source_profiles.py, which overrides this per test.
+os.environ.setdefault("DATA_SOURCE_PROFILE", "full")
 
 import numpy as np
 import pandas as pd

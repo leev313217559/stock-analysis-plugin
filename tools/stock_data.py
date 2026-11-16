@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _cache import DAY, WEEK, atomic_write, cached  # noqa: E402
 from _subproc import error_message, run_tool, scrub_secrets, socket_timeout, utf8_stdio  # noqa: E402
+from sources import select, select_for_label  # noqa: E402
 from trading_calendar import market_now  # noqa: E402
 
 
@@ -121,6 +122,7 @@ def _failover(sources: list, label: str, evidence: bool = False):
     TTL), so it survives across the one-process-per-CLI-call host model; a stale
     entry costs one failed attempt, then the new winner replaces it (self-healing).
     """
+    sources = select_for_label(label, sources)
     chain = label.split(":", 1)[0]
     sticky = None
     if chain in _STICKY_CHAINS:
@@ -1061,6 +1063,9 @@ def _yf_failover(symbol: str, yfinance, tencent, finnhub, longbridge, alphavanta
             ("tencent", tencent),
             ("alphavantage", alphavantage),
         ]
+    kind = label.split(":", 1)[0]
+    market_key = market.lower() if market in ("HK", "US") else "other"
+    sources = select(f"yf_{kind}_{market_key}", sources)
     return _failover(sources, label=label, evidence=evidence)
 
 
