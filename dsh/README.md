@@ -65,6 +65,8 @@ dsh 0.2.2 及以上（工具注册支持按步骤的 `when` 条件）默认增�
 
 这里的 `stock_tool_search` 是 dsh 适配器的目录控制工具，作用类似 Pi/Hermes/OpenClaw 的宿主发现入口，不增加共享 Python 分析能力，也不执行分析。
 
+调用顺序：**任何股票工具都必须先通过 `stock_tool_search` 加载**；未加载直接调用会返回 `unknown tool`。一次搜索可以命中多个工具（`limit` 最多 20），加载后在下一次模型请求按原名调用。
+
 ## 工具与 Skills
 
 73 个工具覆盖行情与基金净值、技术分析与 K 线形态、资金流与板块、估值/股东/ETF/股息、公告与 SEC、多因子选股、策略回测、市场复盘、新闻舆情、持仓风险与调仓计算。完整列表见[主仓库 README · 工具列表](https://github.com/Weaxs/stock-analysis-plugin#工具列表)，Skills 见 [Skills 一览](https://github.com/Weaxs/stock-analysis-plugin#skills-一览)。
