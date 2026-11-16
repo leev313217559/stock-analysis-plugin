@@ -158,8 +158,10 @@ try {
     const created = await call(handler, put("/stock-analysis/api/config", { content, expectedMtimeMs: null }));
     assert.equal(created.status(), 200);
     assert.equal(readFileSync(envFile, "utf8"), content);
-    if (process.platform !== "win32") assert.equal(statSync(envFile).mode & 0o777, 0o600);
-    assert.equal(created.json().mode, "600");
+    if (process.platform !== "win32") {
+      assert.equal(statSync(envFile).mode & 0o777, 0o600);
+      assert.equal(created.json().mode, "600");
+    }
 
     const loaded = await call(handler, get("/stock-analysis/api/config"));
     assert.equal(loaded.json().exists, true);
