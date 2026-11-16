@@ -84,3 +84,4 @@ pyTool({
 - discovery 注册时收集每个工具的 keywords，拼进搜索文本并生成派生别名表（keyword → tools）；查询命中共享别名时优先提升，`财报` 这类词可以一次加载多个相关工具
 - 关键词跟着工具定义走，不单独维护映射表；新增工具时在同一个 block 里补关键词即可
 - 搜索测试覆盖 `资金流`、`龙虎榜`、`研报`、`财报`、`13F` 等典型词
+- 审阅用生成清单：`docs/tool-keywords.md`（运行 `node scripts/export-tool-keywords.mjs` 刷新，勿手改）
