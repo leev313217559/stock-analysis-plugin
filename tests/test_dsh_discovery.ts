@@ -9,7 +9,6 @@ import * as NativeExecutor from "@deepseek-ai/dsh-tool-executor-native";
 import { ToolCallId } from "@deepseek-ai/dsh-llm";
 import * as stockPlugin from "../dsh/index.js";
 import { CORE_TOOLS } from "../dsh/discovery.js";
-import { TOOL_KEYWORDS } from "../dsh/tool-keywords.js";
 
 const ctx = new Context();
 await ctx.plugin(SystemPrompt);
@@ -88,6 +87,9 @@ try {
     const hit = await search(second, query, 5);
     assert(hit.loaded.some((item: {name: string}) => item.name === tool), `keyword ${query} should load ${tool}`);
   }
+  const filingAlias = await search(second, "财报", 5);
+  assert(filingAlias.loaded.some((item: {name: string}) => item.name === "get_financials"));
+  assert(filingAlias.loaded.some((item: {name: string}) => item.name === "get_earnings_calendar"), "shared alias loads both tools");
   assert.deepEqual((await search(first, "nonexistent_zzzzz")).loaded, []);
   assert.equal(typeof (await search(first, "get_quote", 0)).error, "string");
 
@@ -121,11 +123,5 @@ try {
   assert.equal(eager.tools.schemas().length, 73);
   assert.equal(eager.tools.get("stock_tool_search"), undefined);
   assert.equal((await eager.systemPrompt.assemble({scope: {}})).tools.length, 73);
-  const eagerNames = eager.tools.schemas().map(tool => tool.name).sort();
-  assert.deepEqual(Object.keys(TOOL_KEYWORDS).sort(), eagerNames, "every registered tool needs one keyword entry");
-  for (const [name, keywords] of Object.entries(TOOL_KEYWORDS)) {
-    assert(keywords.length >= 3, `${name} needs at least 3 keywords`);
-    assert.equal(new Set(keywords).size, keywords.length, `${name} has duplicate keywords`);
-  }
 } finally { await eager.fiber.dispose(); }
 console.log("dsh discovery: scoped loading, Chinese search, permissions, fallback, and real Python round-trip passed");

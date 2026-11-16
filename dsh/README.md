@@ -69,22 +69,18 @@ dsh 0.2.2 及以上（工具注册支持按步骤的 `when` 条件）默认增�
 
 ### 工具关键词元数据
 
-搜索不是语义向量搜索，而是词面匹配；为了弥补同义词/口语词，维护一张集中式关键词表：
+搜索不是语义向量搜索，而是词面匹配；为了弥补同义词/口语词，每个工具定义里直接带 `keywords`：
 
-```text
-dsh/tool-keywords.ts
+```ts
+pyTool({
+  name: "get_capital_flow",
+  description: "...",
+  keywords: ["资金流", "主力资金", "超大单", "大单", "净流入", "capital flow"],
+  parameters: {...},
+})
 ```
 
-- 每个已注册工具恰好一条，按工具名排序；值是中文用户词汇 + 英文/缩写别名
-- 搜索文本 = 工具名 + 描述 + 关键词；关键词整词命中会获得额外权重
-- 新增工具时必须补一条；`tests/test_dsh_discovery.ts` 会校验 73 个工具与关键词表完全一致、无重复键
-- 这是 fork 的单一维护点：上游合并工具代码时，不会和 73 个分散的描述修改冲突
-
-
-## 工具与 Skills
-
-73 个工具覆盖行情与基金净值、技术分析与 K 线形态、资金流与板块、估值/股东/ETF/股息、公告与 SEC、多因子选股、策略回测、市场复盘、新闻舆情、持仓风险与调仓计算。完整列表见[主仓库 README · 工具列表](https://github.com/Weaxs/stock-analysis-plugin#工具列表)，Skills 见 [Skills 一览](https://github.com/Weaxs/stock-analysis-plugin#skills-一览)。
-
-## 其他宿主
-
-同一套工具也以 Pi Agent extension、Hermes plugin、OpenClaw plugin 和 MCP stdio 服务器形式分发，见[主仓库 README · 快速开始](https://github.com/Weaxs/stock-analysis-plugin#快速开始)。
+- `pyTool` / `closedTool` 的 `keywords` 是必填字段，漏写会直接 TS 编译失败
+- discovery 注册时收集每个工具的 keywords，拼进搜索文本并生成派生别名表（keyword → tools）；查询命中共享别名时优先提升，`财报` 这类词可以一次加载多个相关工具
+- 关键词跟着工具定义走，不单独维护映射表；新增工具时在同一个 block 里补关键词即可
+- 搜索测试覆盖 `资金流`、`龙虎榜`、`研报`、`财报`、`13F` 等典型词

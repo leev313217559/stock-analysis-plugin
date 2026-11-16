@@ -1,7 +1,6 @@
 import type { Context } from "@deepseek-ai/cordis";
 import { defineTool, type ToolRegistrationOptions } from "@deepseek-ai/dsh-tools";
 import type {} from "@deepseek-ai/dsh-system-prompt";
-import { keywordsFor } from "./tool-keywords.js";
 
 const SEARCH = "stock_tool_search";
 // High-frequency tools stay eager so a model mistake (searching the wrong name)
@@ -17,10 +16,21 @@ export const CORE_TOOLS = new Set([
 ]);
 
 // Returns the per-tool registration option; stock tools stay hidden per agent until searched.
-export function createToolDiscovery(ctx: Context): (tool: {name: string; description: string}) => ToolRegistrationOptions | undefined {
+export function createToolDiscovery(ctx: Context): (tool: {name: string; description: string}, keywords: readonly string[]) => ToolRegistrationOptions | undefined {
   if (typeof ctx.tools.resolve !== "function" || ctx.tools.get(SEARCH)) return () => undefined;
   const names = new Map<string, string>();
+  const keywordMap = new Map<string, readonly string[]>();
+  const aliasIndex = new Map<string, Set<string>>();
   const loaded = new WeakMap<object, Set<string>>();
+  const indexKeywords = (name: string, keywords: readonly string[]) => {
+    for (const raw of keywords) {
+      const alias = raw.trim().toLowerCase();
+      if (alias.length < 2) continue;
+      let tools = aliasIndex.get(alias);
+      if (!tools) aliasIndex.set(alias, tools = new Set());
+      tools.add(name);
+    }
+  };
   const ptc = new WeakSet<object>();
   // Search restricted away, or a PTC SDK presentation: expose the full catalog and reset loading.
   const active = (agent: object) => {
@@ -50,7 +60,7 @@ export function createToolDiscovery(ctx: Context): (tool: {name: string; descrip
       const candidates = [...names]
         .filter(([name]) => ctx.tools.get(name, agent))
         .map(([name, description]) => {
-          const keywords = keywordsFor(name);
+          const keywords = keywordMap.get(name) ?? [];
           const keywordText = keywords.join(" ").toLowerCase();
           return {
             tool: {name, description},
@@ -60,11 +70,21 @@ export function createToolDiscovery(ctx: Context): (tool: {name: string; descrip
         });
       // Generic stock terms should not outrank the specific capability being searched.
       const weights = terms.map(term => 1 / (1 + candidates.filter(({text}) => text.includes(term)).length));
+      // Derived alias table: a query containing a shared keyword boosts every tool that
+      // registered it; longer aliases (财报日历 vs 财报) win the tie.
+      const aliasBoosts = new Map<string, number>();
+      for (const [alias, tools] of aliasIndex) {
+        if (!needle.includes(alias)) continue;
+        for (const name of tools) {
+          aliasBoosts.set(name, Math.max(aliasBoosts.get(name) ?? 0, 60 + alias.length * 2));
+        }
+      }
       const matches = candidates
         .map(({tool, keywordText, text}) => {
           const score = (tool.name === needle ? 1000 : 0)
             + (text.includes(needle) ? 10 : 0)
             + (keywordText.includes(needle) ? 40 : 0)
+            + (aliasBoosts.get(tool.name) ?? 0)
             + terms.reduce((sum, term, index) => sum + weights[index]
               * (tool.name.includes(term) ? 4 : keywordText.includes(term) ? 2.5 : text.includes(term) ? 1 : 0), 0);
           return {tool, score};
@@ -89,8 +109,10 @@ export function createToolDiscovery(ctx: Context): (tool: {name: string; descrip
     return result;
   });
 
-  return ({name, description}) => {
+  return ({name, description}, keywords) => {
     names.set(name, description);
+    keywordMap.set(name, keywords);
+    indexKeywords(name, keywords);
     if (CORE_TOOLS.has(name)) return undefined;
     return {when: ({agent}) => !active(agent) || (loaded.get(agent)?.has(name) ?? false)};
   };
