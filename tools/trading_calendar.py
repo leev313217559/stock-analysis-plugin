@@ -53,7 +53,9 @@ def cn_trade_dates(year: int) -> set[str]:
             import akshare as ak
 
             with socket_timeout(25):
-                fetch = getattr(ak, "calendar_trade_date_hist_sina", None) or getattr(ak, "tool_trade_date_hist_sina", None)
+                fetch = getattr(ak, "calendar_trade_date_hist_sina", None) or getattr(
+                    ak, "tool_trade_date_hist_sina", None
+                )
                 if fetch is None:
                     raise AttributeError("akshare provides no trade-date calendar")
                 df = fetch()

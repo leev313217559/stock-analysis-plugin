@@ -31,6 +31,7 @@ def _ak_any(*names):
             return fn
     raise AttributeError(f"akshare provides none of: {', '.join(names)}")
 
+
 # Explicitly exchange-prefixed A-share codes (sh600519 / sz000858 / bj920001).
 # Bare 6-digit codes are always stocks; the prefix is the disambiguation escape
 # hatch for index codes (sh000001 = 上证指数, not 平安银行).
@@ -630,7 +631,11 @@ def _kline_akshare(symbol: str, period: str, count: int) -> list:
     start = end - timedelta(days=count * 7 if period == "weekly" else count * 31 if period == "monthly" else count * 2)
 
     # ETFs (51/52/56/58/15/16/18xxxx) are not covered by stock_zh_a_hist
-    hist_fn = ak.fund_etf_hist_em if normalize_stock_code(symbol)["is_etf"] else _ak_any("stock_zh_a_hist_em", "stock_zh_a_hist")
+    hist_fn = (
+        ak.fund_etf_hist_em
+        if normalize_stock_code(symbol)["is_etf"]
+        else _ak_any("stock_zh_a_hist_em", "stock_zh_a_hist")
+    )
     df = _akshare_retry(
         hist_fn,
         symbol=symbol,
@@ -1593,8 +1598,6 @@ def cmd_capital_flow(args):
 
     if mode == "sector_flow":
         try:
-            import akshare as ak
-
             df = _akshare_retry(_ak_any("stock_fund_flow_sector_rank_em", "stock_sector_fund_flow_rank"))
             if df is None or df.empty:
                 return {"error": "Sector fund flow data unavailable"}
@@ -1615,14 +1618,14 @@ def cmd_capital_flow(args):
     if detect_market(args.symbol) != "A":
         return {"error": "capital_flow only available for A-shares"}
     try:
-        import akshare as ak
-
         # Exchange via the shared prefix helper: bare 9/5-prefix SH codes, BSE
         # (43/81-83/87/88/92) and explicitly-prefixed input (sh600519) all resolve;
         # akshare wants the bare 6-digit stock plus market ∈ {sh, sz, bj}.
         code = _cn_code(args.symbol)
         market, stock = code[:2], code[2:]
-        df = _akshare_retry(_ak_any("stock_fund_flow_individual_hist_em", "stock_individual_fund_flow"), stock=stock, market=market)
+        df = _akshare_retry(
+            _ak_any("stock_fund_flow_individual_hist_em", "stock_individual_fund_flow"), stock=stock, market=market
+        )
         col_map = {
             "日期": "date",
             "主力净流入-净额": "main_net_inflow",
@@ -1998,7 +2001,6 @@ def _snapshot_efinance() -> list:
 
 
 def _snapshot_sina() -> list:
-    import akshare as ak
     import pandas as pd
 
     df = _akshare_retry(_ak_any("stock_zh_a_spot_sina", "stock_zh_a_spot"))
@@ -2940,7 +2942,8 @@ def cmd_stock_info(args):
                     nav_df = _cached_frame(
                         f"etf-basic-nav:{args.symbol}",
                         lambda: _akshare_retry(
-                            getattr(ak, "fund_exchange_nav_hist_em", None) or getattr(ak, "fund_etf_fund_info_em", None),
+                            getattr(ak, "fund_exchange_nav_hist_em", None)
+                            or getattr(ak, "fund_etf_fund_info_em", None),
                             fund=args.symbol,
                             start_date=start.strftime("%Y%m%d"),
                             end_date=end.strftime("%Y%m%d"),

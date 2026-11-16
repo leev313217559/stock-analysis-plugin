@@ -409,10 +409,10 @@ def test_csi_fallback_never_labels_total_share_pe_as_ttm(monkeypatch):
 
     monkeypatch.setattr(ak, "stock_index_pe_lg", unavailable)
     monkeypatch.setattr(ak, "stock_index_pb_lg", unavailable)
-    monkeypatch.setattr(ak, "stock_zh_index_hist_csindex", unavailable)
+    monkeypatch.setattr(ak, "index_hist_csindex", unavailable)
     monkeypatch.setattr(
         ak,
-        "stock_zh_index_value_csindex",
+        "index_value_csindex",
         lambda **k: pd.DataFrame({"日期": ["2026-10-09"], "市盈率1": [15], "股息率1": [2]}),
     )
     result = value_data.index_valuation(Namespace(symbol="000985", years=5))
@@ -730,10 +730,10 @@ def test_csi_historical_pe_extends_recent_indicator_without_changing_basis(monke
             {"日期": ["2020-01-01", "2022-01-01", "2026-10-09", "2026-10-12"], "滚动市盈率": [1, 10, 20, None]}
         )
 
-    monkeypatch.setattr(ak, "stock_zh_index_hist_csindex", history)
+    monkeypatch.setattr(ak, "index_hist_csindex", history)
     monkeypatch.setattr(
         ak,
-        "stock_zh_index_value_csindex",
+        "index_value_csindex",
         lambda **kwargs: pd.DataFrame({"日期": ["2026-10-09"], "市盈率1": [18], "股息率1": [2]}),
     )
     result = value_data.index_valuation(Namespace(symbol="000985", years=5))
@@ -887,9 +887,9 @@ def test_csi_history_survives_recent_indicator_failure(monkeypatch):
 
     monkeypatch.setattr(ak, "stock_index_pe_lg", unavailable)
     monkeypatch.setattr(ak, "stock_index_pb_lg", unavailable)
-    monkeypatch.setattr(ak, "stock_zh_index_value_csindex", unavailable)
+    monkeypatch.setattr(ak, "index_value_csindex", unavailable)
     monkeypatch.setattr(
-        ak, "stock_zh_index_hist_csindex", lambda **k: pd.DataFrame({"日期": ["2026-10-09"], "滚动市盈率": [20]})
+        ak, "index_hist_csindex", lambda **k: pd.DataFrame({"日期": ["2026-10-09"], "滚动市盈率": [20]})
     )
     result = value_data.index_valuation(Namespace(symbol="000985", years=5))
     assert result["metrics"]["pe_ttm"]["current"] == 20
@@ -908,9 +908,9 @@ def test_optional_lixinger_pb_does_not_overwrite_csi_pe(monkeypatch):
 
     monkeypatch.setattr(ak, "stock_index_pe_lg", unavailable)
     monkeypatch.setattr(ak, "stock_index_pb_lg", unavailable)
-    monkeypatch.setattr(ak, "stock_zh_index_value_csindex", unavailable)
+    monkeypatch.setattr(ak, "index_value_csindex", unavailable)
     monkeypatch.setattr(
-        ak, "stock_zh_index_hist_csindex", lambda **k: pd.DataFrame({"日期": ["2026-10-09"], "滚动市盈率": [20]})
+        ak, "index_hist_csindex", lambda **k: pd.DataFrame({"日期": ["2026-10-09"], "滚动市盈率": [20]})
     )
     monkeypatch.setenv("LIXINGER_TOKEN", "test-token")
     calls = []
@@ -1295,7 +1295,7 @@ def test_etf_benchmark_csi_code_uses_csindex_history(monkeypatch):
     monkeypatch.setattr(ak, "index_stock_cons_csindex", lambda **k: csi.append(("cons", k["symbol"])) or pd.DataFrame())
     monkeypatch.setattr(
         ak,
-        "stock_zh_index_hist_csindex",
+        "index_hist_csindex",
         lambda **k: csi.append(("hist", k["symbol"])) or pd.DataFrame({"日期": ["2026-10-09"], "收盘": [1000.0]}),
     )
     monkeypatch.setattr(value_data, "fund_size_history", lambda *a: [])
@@ -1323,7 +1323,7 @@ def test_etf_benchmark_csi_outage_keeps_other_sections(monkeypatch):
     monkeypatch.setattr(ak, "fund_exchange_nav_hist_em", lambda **k: pd.DataFrame(), raising=False)
     monkeypatch.setattr(ak, "fund_portfolio_hold_em", lambda **k: pd.DataFrame())
     monkeypatch.setattr(ak, "index_stock_cons_csindex", down)
-    monkeypatch.setattr(ak, "stock_zh_index_hist_csindex", down)
+    monkeypatch.setattr(ak, "index_hist_csindex", down)
     monkeypatch.setattr(value_data, "fund_size_history", lambda *a: [])
     monkeypatch.setattr(value_data, "etf_basket", lambda *a: {"complete": True})
     monkeypatch.setattr("_subproc.run_tool", lambda *a, **k: {})
