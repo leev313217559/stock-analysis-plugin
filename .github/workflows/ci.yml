@@ -1,3 +1,4 @@
+# Re-register this workflow after the Actions UI deleted it; safe comment.
 name: CI
 
 on:
@@ -6,6 +7,7 @@ on:
   pull_request:
     branches: [main]
   workflow_call:
+  workflow_dispatch:
 
 # One active run per branch/PR — new pushes cancel stale runs.
 concurrency:
