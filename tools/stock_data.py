@@ -1960,26 +1960,36 @@ def _financials_without_dcf(args, periods, annual, market):
 # --------------- market_snapshot ---------------
 
 
-def snapshot_a() -> list:
+def snapshot_a(*, fast: bool = False) -> list:
     # akshare/efinance leave requests timeout-less — the chain-wide socket bound
     # (socket_timeout) is what lets the tencent leg get its turn on a dead network.
+    # market_stats only needs breadth/turnover; efinance returns that in seconds and
+    # avoids the much slower akshare full snapshot. Stock screening still uses the
+    # richer default chain.
+    sources = (
+        [
+            ("efinance", _snapshot_efinance),
+            ("sina", _snapshot_sina),
+            ("tencent", _snapshot_tencent),
+        ]
+        if fast
+        else [
+            ("akshare", _snapshot_akshare),
+            ("efinance", _snapshot_efinance),
+            ("sina", _snapshot_sina),
+            ("tencent", _snapshot_tencent),
+        ]
+    )
     try:
         with socket_timeout(25):
-            return _failover(
-                [
-                    ("akshare", _snapshot_akshare),
-                    ("efinance", _snapshot_efinance),
-                    ("sina", _snapshot_sina),
-                    ("tencent", _snapshot_tencent),
-                ],
-                label="snapshot_a",
-            )
+            return _failover(sources, label="snapshot_a_fast" if fast else "snapshot_a")
     except Exception as e:
         return [{"error": f"A-share snapshot unavailable from all sources: {error_message(e)}"}]
 
 
 def _snapshot_efinance() -> list:
     import efinance as ef
+    import pandas as pd
 
     df = ef.stock.get_realtime_quotes()
     if df is None or df.empty:
@@ -2000,6 +2010,10 @@ def _snapshot_efinance() -> list:
         "昨收": "prev_close",
     }
     df = df.rename(columns=col_map)
+    # efinance uses "-" for suspended/unknown fields; compute_market_stats requires numbers.
+    for column in col_map.values():
+        if column in df.columns and column not in ("symbol", "name"):
+            df[column] = pd.to_numeric(df[column], errors="coerce")
     df["pe_basis"] = "dynamic"
     keep = [c for c in col_map.values() if c in df.columns] + ["pe_basis"]
     return [_clean_row(r) for r in df[keep].to_dict("records")]
@@ -3161,7 +3175,7 @@ def compute_market_stats(data: list) -> dict:
 def cmd_market_stats(args):
     market = getattr(args, "market", "A")
     try:
-        data = {"A": snapshot_a, "HK": snapshot_hk, "US": snapshot_us}[market]()
+        data = snapshot_a(fast=True) if market == "A" else {"HK": snapshot_hk, "US": snapshot_us}[market]()
         if isinstance(data, dict) and "error" in data:
             return data
         if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict) and "error" in data[0]:

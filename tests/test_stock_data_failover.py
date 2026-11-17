@@ -3878,3 +3878,19 @@ def test_curl_transport_failures_still_retry():
         with patch("tools.stock_data.time.sleep"):
             assert _akshare_retry(source) == {"ok": True}
         assert source.call_count == 2
+
+
+def test_market_stats_uses_fast_snapshot(monkeypatch):
+    import pandas as pd
+
+    from tools import stock_data
+
+    frame = pd.DataFrame(
+        [
+            {"股票代码": "600519", "股票名称": "贵州茅台", "最新价": 1400.0, "涨跌幅": 1.0, "涨跌额": 14.0, "成交量": 100, "成交额": 1_000_000, "动态市盈率": 20, "换手率": 1, "最高": 1410, "最低": 1390, "今开": 1395, "昨日收盘": 1386},
+        ]
+    )
+    monkeypatch.setattr("efinance.stock.get_realtime_quotes", lambda: frame, raising=False)
+    result = stock_data.cmd_market_stats(Namespace(market="A"))
+    assert result["total_stocks"] == 1
+    assert result["up_count"] == 1
