@@ -1474,9 +1474,9 @@ def cmd_capital_flow(args):
         # akshare wants the bare 6-digit stock plus market ∈ {sh, sz, bj}.
         code = _cn_code(args.symbol)
         market, stock = code[:2], code[2:]
-        df = _akshare_retry(
-            _ak_any("stock_fund_flow_individual_hist_em", "stock_individual_fund_flow"), stock=stock, market=market
-        )
+        # Positional: the 1.20.45 rename also renamed `stock=` to `symbol=`.
+        flow = _ak_any("stock_fund_flow_individual_hist_em", "stock_individual_fund_flow")
+        df = _akshare_retry(flow, stock, market)
         col_map = {
             "日期": "date",
             "主力净流入-净额": "main_net_inflow",
@@ -2093,7 +2093,7 @@ def cmd_market_indices(args):
             ]
             results = []
             # akshare 1.20.44 renamed the Sina index snapshot; tolerate both names.
-            spot_em = getattr(ak, "stock_zh_index_spot_em", None)
+            spot_em = getattr(ak, "index_zh_spot_em", None) or getattr(ak, "stock_zh_index_spot_em", None)
             spot_sina = getattr(ak, "index_zh_spot_sina", None) or getattr(ak, "stock_zh_index_spot_sina", None)
             try:
                 if spot_em is None:

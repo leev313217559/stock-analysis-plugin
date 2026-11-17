@@ -201,6 +201,11 @@ INDEX_NAMES = {
 }
 
 
+def _csi_hist(ak):
+    # akshare 1.20.44 renamed it; py3.10 stays below 1.20.40 with the old name.
+    return getattr(ak, "index_hist_csindex", None) or ak.stock_zh_index_hist_csindex
+
+
 def lixinger_index_history(code, start, end):
     import requests
 

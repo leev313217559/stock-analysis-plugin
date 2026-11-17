@@ -3372,8 +3372,8 @@ class TestCapitalFlowMarketDetection:
 
         captured = {}
 
-        def fake_retry(fn, **kw):
-            captured.update(kw)
+        def fake_retry(fn, *args, **kw):
+            captured.update(zip(("stock", "market"), args), **kw)
             return pd.DataFrame({"日期": ["2026-09-18"], "主力净流入-净额": [1.0e6]})
 
         monkeypatch.setattr("tools.stock_data._akshare_retry", fake_retry)
