@@ -1,3 +1,4 @@
+# dsh-only CI: Python core + dsh adapter/dashboard + dsh host smoke.
 name: CI
 
 on:
