@@ -218,6 +218,51 @@ def test_non_cn_indices_fetch_in_parallel_and_keep_symbol_order(mock_yfinance):
     assert result[0]["change_pct"] == 1
 
 
+def test_cn_indices_fallback_to_sina_for_missing_shenzhen_rows(monkeypatch):
+    import akshare as ak
+    import pandas as pd
+
+    em = pd.DataFrame(
+        {
+            "代码": ["000001", "000688", "000300", "000016"],
+            "名称": ["上证指数", "科创50", "沪深300", "上证50"],
+            "最新价": [3500.0, 1200.0, 4000.0, 2700.0],
+            "涨跌额": [1.0, 2.0, 3.0, 4.0],
+            "涨跌幅": [0.1, 0.2, 0.3, 0.4],
+            "成交量": [1, 2, 3, 4],
+            "成交额": [10, 20, 30, 40],
+            "最高": [3510.0, 1210.0, 4010.0, 2710.0],
+            "最低": [3490.0, 1190.0, 3990.0, 2690.0],
+            "今开": [3501.0, 1201.0, 4001.0, 2701.0],
+            "昨收": [3499.0, 1198.0, 3997.0, 2696.0],
+        }
+    )
+    sina = pd.DataFrame(
+        {
+            "代码": ["sz399001", "sz399006"],
+            "名称": ["深证成指", "创业板指"],
+            "最新价": [10600.0, 2300.0],
+            "涨跌额": [-10.0, -20.0],
+            "涨跌幅": [-0.1, -0.8],
+            "成交量": [5, 6],
+            "成交额": [50, 60],
+            "最高": [10700.0, 2310.0],
+            "最低": [10500.0, 2290.0],
+            "今开": [10650.0, 2305.0],
+            "昨收": [10610.0, 2310.0],
+        }
+    )
+    monkeypatch.setattr(ak, "index_zh_spot_em", lambda: em, raising=False)
+    monkeypatch.setattr(ak, "index_zh_spot_sina", lambda: sina, raising=False)
+
+    result = cmd_market_indices(Namespace(region="cn"))
+
+    assert [row["code"] for row in result] == ["sh000001", "sz399001", "sz399006", "sh000688", "sh000300", "sh000016"]
+    assert result[1]["price"] == 10600.0
+    assert result[2]["price"] == 2300.0
+    assert all(row.get("price") is not None for row in result)
+
+
 def _hstech_tencent_quote():
     fields = ["0"] * 50
     fields[1], fields[3], fields[4], fields[5] = "恒生科技指数", "3838.330", "3931.930", "3918.210"

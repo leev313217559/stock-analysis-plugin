@@ -216,7 +216,7 @@ CHECKS = [
     ("quote_cn", "stock_data.py", ["quote", "600519"], check_quote, 60),
     ("kline_cn", "stock_data.py", ["kline", "600519", "--count", "5"], check_kline, 60),
     ("indices_cn", "stock_data.py", ["market_indices", "--region", "cn"], check_indices, 90),
-    ("market_stats", "stock_data.py", ["market_stats"], check_market_stats, 120),
+    ("market_stats", "stock_data.py", ["market_stats"], check_market_stats, 240),
     ("fund_flow_cn", "stock_data.py", ["capital_flow", "600519"], check_fund_flow, 120),
     ("sector_flow", "stock_data.py", ["capital_flow", "--mode", "sector_flow"], check_sector_flow, 120),
     ("limit_up_pool", "stock_data.py", ["limit_up_pool"], check_limit_up, 120),

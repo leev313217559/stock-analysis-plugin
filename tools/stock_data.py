@@ -2249,6 +2249,7 @@ def cmd_market_indices(args):
             # akshare 1.20.44 renamed the Sina index snapshot; tolerate both names.
             spot_em = getattr(ak, "index_zh_spot_em", None) or getattr(ak, "stock_zh_index_spot_em", None)
             spot_sina = getattr(ak, "index_zh_spot_sina", None) or getattr(ak, "stock_zh_index_spot_sina", None)
+            used_sina = False
             try:
                 if spot_em is None:
                     raise AttributeError("akshare has no stock_zh_index_spot_em")
@@ -2258,15 +2259,32 @@ def cmd_market_indices(args):
                 if spot_sina is None:
                     raise
                 df = _akshare_retry(spot_sina)
+                used_sina = True
+
+            def index_row(frame, code):
+                if frame is None or "代码" not in frame.columns:
+                    return None
+                clean = code[2:] if code[:2] in ("sh", "sz") else code
+                row = frame[frame["代码"] == clean]
+                if row.empty:
+                    row = frame[frame["代码"] == code]
+                return None if row.empty else row.iloc[0]
+
+            # Eastmoney's index snapshot can omit Shenzhen indices (399001/399006).
+            # Fetch Sina only if a requested row is missing, not just on whole-source failure.
+            sina_df = None
+            sina_failed = False
             for code, name in indices:
-                clean_code = code[2:] if code[:2] in ("sh", "sz") else code
-                row = df[df["代码"] == clean_code]
-                if row.empty:
-                    row = df[df["代码"] == code]
-                if row.empty:
+                r = index_row(df, code)
+                if r is None and spot_sina is not None and not used_sina and not sina_failed:
+                    try:
+                        sina_df = _akshare_retry(spot_sina)
+                    except Exception:
+                        sina_failed = True
+                    r = index_row(sina_df, code)
+                if r is None:
                     results.append({"code": code, "name": name, "note": "data unavailable"})
                     continue
-                r = row.iloc[0]
                 results.append(
                     _clean_row(
                         {
