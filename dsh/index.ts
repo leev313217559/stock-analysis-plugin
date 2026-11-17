@@ -157,12 +157,12 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
   register(
     pyTool({
       name: "get_announcements",
-      description: "查询A股巨潮公告与美股SEC EDGAR申报标题、日期、类型和原文链接；按日期范围/类别筛选，默认近90天，top=1..500。A股返回PDF链接，美股返回document_url/filing_url并需SEC_USER_AGENT；正文用extract_article提取，truncated提示截断。美股category=all含8-K/6-K/DEF14A，不支持forecast/express/interim/dividend。",
-      keywords: ["公告", "披露", "巨潮", "SEC公告", "8-K", "10-K", "年报", "季报", "filing", "announcement", "最新公告", "公告查询", "巨潮资讯", "财报公告", "业绩公告"],
+      description: "查询A股巨潮公告、港股HKEXnews公告与美股SEC EDGAR申报标题、日期、类型和原文链接；按日期范围/类别筛选，默认近90天，top=1..500。A/HK返回PDF链接，美股返回document_url/filing_url并需SEC_USER_AGENT；正文用extract_article提取，truncated提示截断。美股category=all含8-K/6-K/DEF14A，不支持forecast/express/interim/dividend。港股支持all/forecast/annual/interim/quarterly/issuance/dividend，类别按HKEX标题与类型识别，筛选类别时total为已读取页内匹配数（total_basis标明）。",
+      keywords: ["公告", "披露", "巨潮", "SEC公告", "8-K", "10-K", "年报", "季报", "filing", "announcement", "最新公告", "公告查询", "巨潮资讯", "财报公告", "业绩公告", "港股公告", "HKEX"],
       parameters: {
   "symbol": {
     "type": "string",
-    "description": "A股代码、美股ticker或CIK（6位数字CIK须加CIK前缀，如CIK320193）",
+    "description": "A股代码、港股代码（如00700.HK）、美股ticker或CIK（6位数字CIK须加CIK前缀，如CIK320193）",
     "required": true
   },
   "category": {
@@ -179,7 +179,7 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
       "inquiry",
       "dividend"
     ],
-    "description": "公告类别，默认all；美股仅支持all/annual/quarterly/reduction/issuance/inquiry，8-K/6-K/DEF14A经all查询"
+    "description": "公告类别，默认all；美股仅支持all/annual/quarterly/reduction/issuance/inquiry，8-K/6-K/DEF14A经all查询；港股不支持express/reduction/inquiry"
   },
   "start_date": {
     "type": "string",
@@ -247,12 +247,12 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
   register(
     pyTool({
       name: "get_valuation_history",
-      description: "查询A/HK股票历史PE-TTM/PB、当前正值分位和10/25/50/75/90分位Band，返回实际采样区间；亏损估值分位为null。years=1..10，按天缓存。HK配置LIXINGER_TOKEN时优先理杏仁非金融公司日历史，失败降级百度，不混接来源。",
-      keywords: ["估值历史", "历史PE", "历史PB", "估值分位", "PE-TTM", "valuation history", "估值区间", "历史分位", "百分位", "估值百分位", "历史估值分位", "PE历史", "PB历史"],
+      description: "查询A/HK/US股票历史PE-TTM/PB、当前正值分位和10/25/50/75/90分位Band，返回实际采样区间；亏损估值分位为null。years=1..10，按天缓存。A/HK配置LIXINGER_TOKEN时优先理杏仁非金融公司日历史，失败降级百度，不混接来源。美股需SEC_USER_AGENT，按SEC申报日生效的TTM净利润/股东权益/股本与Yahoo周收盘派生（周采样），share_basis标明股本口径。",
+      keywords: ["估值历史", "历史PE", "历史PB", "估值分位", "PE-TTM", "valuation history", "估值区间", "历史分位", "百分位", "估值百分位", "历史估值分位", "PE历史", "PB历史", "美股估值"],
       parameters: {
         "symbol": {
           "type": "string",
-          "description": "A股代码或港股.HK代码",
+          "description": "A股代码、港股.HK代码或美股代码",
           "required": true
         },
         "years": {
@@ -497,18 +497,20 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
   register(
     pyTool({
       name: "get_financials",
-      description: "获取股票财务摘要及历史趋势，按天缓存。A股annual=true与periods=10取十年年报；港股可配置LIXINGER_TOKEN取非金融公司财务序列，保留币种/披露日/实际财年，历史比率单位percent。有效Yahoo顶层快照按整组保留，currency为财报币种、market_cap_currency为市值币种、snapshot_source标明来源；缺失值及report_date不混入历史数值/日期。缺token或无权限降级原有来源并标注不足，不补造缺失。估值历史用get_valuation_history，披露排期用get_earnings_calendar",
-      keywords: ["财务", "财报", "营收", "净利润", "现金流", "ROE", "毛利率", "financials", "income statement", "balance sheet", "利润表", "资产负债表", "业绩", "增速", "净利率", "财报解读"],
+      description: "获取股票财务摘要及历史趋势，按天缓存。A股annual=true与periods=10取十年年报；港股可配置LIXINGER_TOKEN取非金融公司财务序列，保留币种/披露日/实际财年，历史比率单位percent。有效Yahoo顶层快照按整组保留，currency为财报币种、market_cap_currency为市值币种、snapshot_source标明来源；缺失值及report_date不混入历史数值/日期。缺token或无权限降级原有来源并标注不足，不补造缺失。估值历史用get_valuation_history，披露排期用get_earnings_calendar。include_dcf_inputs=true时A/港/美股追加年度DCF输入：美股优先SEC companyfacts，A股/港股配置LIXINGER_TOKEN时优先理杏仁，主源缺失字段按同财年同币种用Yahoo补齐并在field_sources标注，仍缺列入missing_fields；total_debt不含租赁，lease_liabilities单列；不估算。",
+      keywords: ["财务", "财报", "营收", "净利润", "现金流", "ROE", "毛利率", "financials", "income statement", "balance sheet", "利润表", "资产负债表", "业绩", "增速", "净利率", "财报解读", "DCF输入", "DCF", "自由现金流"],
       parameters: {
         symbol: { type: "string", required: true, description: "股票代码（A股如600519，美股如AAPL，港股如00700.HK）" },
         annual: { type: "boolean", description: "只取年度报告，默认false" },
         periods: { type: "number", description: "返回最近N个报告期1..40，默认1；annual=true时periods=10请求10年年报" },
+        include_dcf_inputs: { type: "boolean", description: "追加A/港/美股年度DCF输入（收入/EBIT/税/现金流/资本开支/现金/债务/租赁负债/少数股东/股本），默认false" },
       },
       script: "stock_data.py",
       argv: (p) => {
         const args = ["financials", p.symbol];
         if (p.periods !== undefined && p.periods !== 1) args.push("--periods", String(p.periods));
         if (p.annual) args.push("--annual");
+        if (p.include_dcf_inputs) args.push("--include-dcf-inputs");
         return args;
       },
     })
@@ -602,8 +604,8 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
     pyTool({
       name: "get_sector_rankings",
       description:
-        "获取A股板块涨跌幅排行（含领涨股、涨跌家数等）。board_type=industry（默认）为行业板块，board_type=concept 时为概念板块排行。支持查看涨幅榜/跌幅榜/双向",
-      keywords: ["板块排行", "行业涨幅", "概念板块", "领涨板块", "板块轮动", "sector ranking", "sector performance", "热点板块", "概念排行", "板块强度", "板块涨跌", "行业排名", "概念板块排行"],
+        "获取板块涨跌幅排行。market=A（默认）为A股板块（含领涨股、涨跌家数等），board_type=industry（默认）为行业、concept为概念；market=US用SPDR行业ETF最近两个收盘作美股11个行业代理（仅industry，proxy字段标注，非交易所官方行业数据）。支持查看涨幅榜/跌幅榜/双向",
+      keywords: ["板块排行", "行业涨幅", "概念板块", "领涨板块", "板块轮动", "sector ranking", "sector performance", "热点板块", "概念排行", "板块强度", "板块涨跌", "行业排名", "概念板块排行", "美股行业", "SPDR", "行业ETF"],
       parameters: {
         top: { type: "number", description: "返回排名前N的板块，默认 10" },
         direction: {
@@ -616,6 +618,11 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
           enum: ["industry", "concept"],
           description: "板块类型：industry=行业（默认），concept=概念",
         },
+        market: {
+          type: "string",
+          enum: ["A", "US"],
+          description: "市场：A=A股（默认），US=美股行业ETF代理",
+        },
       },
       script: "stock_data.py",
       argv: (p) => [
@@ -626,6 +633,8 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
         p.direction ?? "top",
         "--board-type",
         p.board_type ?? "industry",
+        "--market",
+        p.market ?? "A",
       ],
     })
   );
@@ -712,11 +721,17 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
     pyTool({
       name: "get_market_stats",
       description:
-        "获取A股市场整体统计（涨跌家数、涨停跌停数、平均涨幅、涨跌Top5、总成交额）。用于衡量市场整体情绪与温度",
-      keywords: ["涨跌家数", "涨停跌停", "市场宽度", "成交额", "市场情绪", "market stats", "market breadth", "赚钱效应", "市场温度", "跌停家数", "涨停家数", "涨跌分布", "市场热度", "涨停数", "跌停数"],
-      parameters: {},
+        "获取市场整体统计（涨跌家数、平均/中位涨幅、涨跌Top5、总成交额）。market=A（默认）含涨停跌停数；HK/US基于东方财富全市场快照，无涨跌停制度，涨跌停字段为null。用于衡量市场整体情绪与温度",
+      keywords: ["涨跌家数", "涨停跌停", "市场宽度", "成交额", "市场情绪", "market stats", "market breadth", "赚钱效应", "市场温度", "跌停家数", "涨停家数", "涨跌分布", "市场热度", "涨停数", "跌停数", "港股宽度", "美股宽度"],
+      parameters: {
+        market: {
+          type: "string",
+          enum: ["A", "HK", "US"],
+          description: "市场：A（默认）/HK/US",
+        },
+      },
       script: "stock_data.py",
-      argv: () => ["market_stats"],
+      argv: (p) => ["market_stats", "--market", p.market ?? "A"],
     })
   );
 
@@ -2399,6 +2414,114 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
     async execute(params) {
       return withJsonInput(params, (path: string) =>
         runPy("stateless_analysis.py", ["position_size", "--input", path]));
+    },
+  }));
+
+  register(closedTool({
+    name: "calculate_dcf_valuation",
+    description: "无状态达摩达兰式FCFF DCF：输入收入、增长、营业利润率、税率、销售资本比、逐年WACC、永续增长与ROIC及股权桥，输出企业价值、股权价值、每股价值、终值占比和3x3敏感性；不取数、不估WACC、不生成买卖信号。",
+    keywords: ["DCF", "现金流折现", "内在价值", "FCFF", "WACC", "永续增长", "企业价值", "股权价值", "discounted cash flow", "intrinsic value"],
+    parameters:     {
+            "currency": {
+                  "type": "string",
+                  "description": "所有金额统一币种，如USD/HKD/CNY",
+                  "required": true
+            },
+            "units": {
+                  "type": "string",
+                  "description": "金额单位，如million；股数须与每股价值口径一致",
+                  "required": true
+            },
+            "base_revenue": {
+                  "type": "number",
+                  "description": "基期收入，正数",
+                  "required": true
+            },
+            "revenue_growth": {
+                  "type": "array",
+                  "items": {
+                        "type": "number"
+                  },
+                  "description": "逐年收入增长率小数，1..10年，如0.1",
+                  "required": true
+            },
+            "operating_margin": {
+                  "type": "array",
+                  "items": {
+                        "type": "number"
+                  },
+                  "description": "逐年营业利润率小数，长度同revenue_growth",
+                  "required": true
+            },
+            "tax_rate": {
+                  "type": "array",
+                  "items": {
+                        "type": "number"
+                  },
+                  "description": "逐年税率0..1，长度同revenue_growth",
+                  "required": true
+            },
+            "sales_to_capital": {
+                  "type": "number",
+                  "description": "销售资本比，正数；再投资=收入增量/该值",
+                  "required": true
+            },
+            "wacc": {
+                  "type": "array",
+                  "items": {
+                        "type": "number"
+                  },
+                  "description": "逐年WACC 0..1，长度同revenue_growth",
+                  "required": true
+            },
+            "terminal_growth": {
+                  "type": "number",
+                  "description": "永续增长率小数，须小于terminal_wacc且不大于terminal_roic",
+                  "required": true
+            },
+            "terminal_wacc": {
+                  "type": "number",
+                  "description": "永续期WACC 0..1",
+                  "required": true
+            },
+            "terminal_roic": {
+                  "type": "number",
+                  "description": "永续期ROIC，正数；终值再投资率=terminal_growth/terminal_roic",
+                  "required": true
+            },
+            "cash": {
+                  "type": "number",
+                  "description": "现金，默认0"
+            },
+            "debt": {
+                  "type": "number",
+                  "description": "有息债务，默认0"
+            },
+            "minority_interests": {
+                  "type": "number",
+                  "description": "少数股东权益，默认0"
+            },
+            "nonoperating_assets": {
+                  "type": "number",
+                  "description": "非经营资产，默认0"
+            },
+            "other_claims": {
+                  "type": "number",
+                  "description": "其他股权前索取权，默认0"
+            },
+            "diluted_shares": {
+                  "type": "number",
+                  "description": "稀释后股本，正数",
+                  "required": true
+            },
+            "current_price": {
+                  "type": "number",
+                  "description": "可选当前股价，用于计算upside_pct"
+            }
+      },
+    async execute(params) {
+      return withJsonInput(params, (path: string) =>
+        runPy("stateless_analysis.py", ["dcf", "--input", path]));
     },
   }));
 
