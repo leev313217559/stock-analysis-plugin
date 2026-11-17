@@ -207,27 +207,6 @@ def test_code_mode_respects_explicit_history_start(monkeypatch, rotation_request
         rotation.backtest(request)
 
 
-def test_new_tool_cli_and_hermes_execute_real_backtest(tmp_path, rotation_request):
-    from hermes.tools import backtest_rotation_allocation, calculate_rotation_metrics
-
-    path = tmp_path / "rotation.json"
-    path.write_text(json.dumps(rotation_request))
-    cli = subprocess.run(
-        [sys.executable, str(SCRIPT.parents[3] / "tools/sector_rotation.py"), "backtest", "--input", str(path)],
-        capture_output=True,
-        text=True,
-        timeout=15,
-    )
-    assert cli.returncode == 0
-    assert json.loads(cli.stdout)["groups"][0]["historical_weight"]["final_equity"] == pytest.approx(730)
-    result = json.loads(backtest_rotation_allocation(rotation_request))
-    assert result["groups"][0]["historical_weight"]["final_equity"] == pytest.approx(730)
-    result = json.loads(
-        calculate_rotation_metrics({"trade_counts": [{"symbol": "X", "buys": 4, "wins": 3, "streak": 2}]})
-    )
-    assert result["allocation"]["assets"][0]["raw_weight"] == 2.25
-
-
 def run_check(tmp_path, command, data):
     path = tmp_path / "input.json"
     path.write_text(json.dumps(data), encoding="utf-8")

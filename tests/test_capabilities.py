@@ -82,10 +82,10 @@ def test_name_resolution_capability_matches_hk_us_support():
 
 
 def test_matrix_covers_every_registered_tool_exactly():
+    import json
+    from pathlib import Path
 
-    from hermes.schemas import TOOL_SCHEMAS
-
-    names = {t["name"] for t in TOOL_SCHEMAS}
+    names = set(json.loads((Path(__file__).parent / "fixtures/dsh-tool-names.json").read_text()))
     assert "get_watchlist" in names
     assert set(capabilities.TOOL_MATRIX) == names
     for market in capabilities.ALL_MARKETS:

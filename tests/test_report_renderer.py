@@ -114,7 +114,7 @@ class TestRender:
 
 
 class TestCLI:
-    """End-to-end: run the CLI the way pi/hermes/openclaw do (subprocess + --input-b64)."""
+    """End-to-end: run the CLI the way dsh does (subprocess + --input-b64)."""
 
     @pytest.mark.parametrize("kind", ["stock", "market"])
     @pytest.mark.parametrize("final", [False, True])

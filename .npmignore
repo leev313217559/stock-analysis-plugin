@@ -16,7 +16,6 @@ node_modules/
 *~
 *.csv
 *.xlsx
-hermes/
 tests/
 .coverage
 .github/

@@ -26,7 +26,7 @@
 
 ## 无状态研究与风险计算
 
-这些工具不保存自选股、账户或分析历史，也不提供调度/通知。现有数据工具采集行情和财务，宿主传入本次持仓、正文或快照；[完整输入约定与解读工作流](../skills/stock-analysis/references/stateless-analysis.md)供四个宿主共用。
+这些工具不保存自选股、账户或分析历史，也不提供调度/通知。现有数据工具采集行情和财务，宿主传入本次持仓、正文或快照；[完整输入约定与解读工作流](../skills/stock-analysis/references/stateless-analysis.md)供 dsh 使用。
 
 大输入经权限受限的临时 JSON 文件传给 Python，调用结束后清理，避免 Windows 命令行长度限制；CLI 也支持 stdin 和 `--input` 文件。公告 HTML/PDF 可用 `extract_article` 从公网提取并检查 `truncated`；无文本层 PDF 的 OCR 仍不包含，只有标题或链接不能声称已读全文。
 

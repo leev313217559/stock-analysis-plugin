@@ -1,84 +1,22 @@
 {
   "name": "@leev313217559/stock-analysis-plugin",
   "version": "0.2.11",
-  "description": "Pi Agent extension for stock analysis, screening, and strategy backtesting across A/HK/US/JP/KR/TW markets",
+  "description": "dsh-only stock analysis plugin development workspace",
   "type": "module",
-  "main": "./pi/index.ts",
-  "pi": {
-    "extensions": [
-      "./pi/index.ts"
-    ],
-    "skills": [
-      "./skills/stock-analysis/SKILL.md",
-      "./skills/stock-screener/SKILL.md",
-      "./skills/strategy-backtest/SKILL.md",
-      "./skills/sector-rotation/SKILL.md",
-      "./skills/bull-trend/SKILL.md",
-      "./skills/shrink-pullback/SKILL.md",
-      "./skills/ma-crossover/SKILL.md",
-      "./skills/volume-breakout/SKILL.md",
-      "./skills/bottom-volume/SKILL.md",
-      "./skills/dragon-head/SKILL.md",
-      "./skills/chan-theory/SKILL.md",
-      "./skills/wave-theory/SKILL.md",
-      "./skills/box-oscillation/SKILL.md",
-      "./skills/emotion-cycle/SKILL.md",
-      "./skills/one-yang-three-yin/SKILL.md",
-      "./skills/wisburg-research/SKILL.md",
-      "./skills/event-driven/SKILL.md",
-      "./skills/expectation-repricing/SKILL.md",
-      "./skills/growth-quality/SKILL.md",
-      "./skills/hot-theme/SKILL.md",
-      "./skills/market-review/SKILL.md"
-    ]
-  },
-  "files": [
-    "pi/",
-    "mcp_host/",
-    "hermes/",
-    "!hermes/**/__pycache__/**",
-    "!mcp_host/**/__pycache__/**",
-    "docs/mcp.md",
-    "tools/**/*.py",
-    "tools/cli_budgets.json",
-    "tools/tool_schemas.json",
-    "tools/requirements.txt",
-    "skills/",
-    "!skills/**/__pycache__/**",
-    "schemas/",
-    "templates/",
-    "strategies/",
-    "scripts/",
-    "!scripts/sync-version.sh"
-  ],
   "scripts": {
     "postinstall": "node scripts/setup-python.mjs",
-    "build:openclaw": "esbuild openclaw/index.ts --bundle --format=esm --platform=node --external:openclaw/* --outfile=openclaw/dist/index.js",
     "build:dsh": "esbuild dsh/index.ts dsh/research-role.ts --bundle --format=esm --platform=node --external:@deepseek-ai/* --outdir=dsh/dist && esbuild dsh/client.ts dsh/web/app.ts dsh/web/index.html dsh/web/style.css --bundle --format=iife --platform=browser --target=es2020 --outbase=dsh --outdir=dsh/dist --loader:.html=copy --loader:.css=copy",
     "audit:keywords": "node scripts/audit-tool-keywords.mjs --check",
     "export:keywords": "node scripts/export-tool-keywords.mjs"
   },
   "keywords": [
-    "pi-agent",
-    "pi-extension",
-    "ai-agent",
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
     "stock",
     "stock-analysis",
-    "stock-market",
     "stock-screener",
-    "backtest",
-    "backtesting",
-    "quantitative-finance",
-    "quantitative-trading",
-    "algorithmic-trading",
-    "technical-analysis",
-    "factor-investing",
-    "a-shares",
-    "hk-stocks",
-    "us-stocks",
-    "akshare",
-    "yfinance",
-    "tushare"
+    "backtest"
   ],
   "repository": {
     "type": "git",
@@ -97,10 +35,10 @@
     "jiti": "^2.7.0",
     "openai": "^7.47.0",
     "tsx": "^4.23.15",
-    "typebox": "^1.4.3",
     "typescript": "^5.5.0"
   },
   "overrides": {
     "zod": "4.6.7"
-  }
+  },
+  "private": true
 }

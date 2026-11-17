@@ -12,8 +12,6 @@
     "typeRoots": ["./typings", "./node_modules/@types"]
   },
   "include": [
-    "pi/index.ts",
-    "openclaw/index.ts",
     "dsh/index.ts",
     "dsh/client.ts",
     "dsh/web/app.ts",

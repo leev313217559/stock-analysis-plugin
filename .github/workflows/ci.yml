@@ -1,4 +1,3 @@
-# Re-register this workflow after the Actions UI deleted it; safe comment.
 name: CI
 
 on:
@@ -9,7 +8,6 @@ on:
   workflow_call:
   workflow_dispatch:
 
-# One active run per branch/PR — new pushes cancel stale runs.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -26,21 +24,19 @@ jobs:
           python-version: "3.11"
 
       - name: Install Python lint tools
-        # Pinned — must match requirements-dev.txt and autofix.yml.
         run: pip install ruff==0.15.20
 
       - name: Ruff check
-        run: ruff check tools/ skills/ tests/ hermes/ mcp_host/
+        run: ruff check tools/ skills/ tests/
 
       - name: Ruff format check
-        run: ruff format --check tools/ skills/ tests/ hermes/ mcp_host/
+        run: ruff format --check tools/ skills/ tests/
 
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: "npm"
 
-      # --ignore-scripts: tsc doesn't need the postinstall-built Python venv.
       - name: Install Node dependencies
         run: npm ci --ignore-scripts
 
@@ -53,7 +49,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.10 leg guards the declared floor; 3.14 matches the Hermes smoke runtime.
         python-version: ["3.11", "3.10", "3.14"]
     steps:
       - uses: actions/checkout@v7
@@ -72,10 +67,6 @@ jobs:
         run: pytest --cov=tools --cov-report=term-missing
 
   network:
-    # Real provider calls (akshare/yfinance) — flaky upstreams by nature, so
-    # gated to same-repo PRs and pushes (forks skip it, like e2e-llm).
-    # continue-on-error: see publish.yml — a flaky upstream must not block the
-    # release path; failures still surface as annotations on the run.
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -97,11 +88,6 @@ jobs:
         run: pytest tests/e2e/test_provider_network.py -m integration_network -v
 
   compat:
-    # Cross-platform host↔python integration on the free runners. This is the
-    # regression surface for OS-specific path bugs like #2 (Windows venv python
-    # location, __dirname/baseDir resolution) that the ubuntu-only jobs above
-    # structurally cannot see. Deterministic by design: no LLM, no secrets, and
-    # the 4 round-trip tools are the non-network set (see tests/e2e/*.ts).
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -123,10 +109,6 @@ jobs:
       - name: Python setup failure check
         run: node tests/test_setup_python.mjs
 
-      # tests/conftest.py imports numpy/pandas at module load, so any pytest run
-      # needs the tools' runtime deps in system python. npm ci's postinstall
-      # separately builds .venv (full requirements) — that's the python the
-      # host↔python round-trips spawn.
       - name: Install dependencies
         run: |
           pip install -r tools/requirements.txt
@@ -136,20 +118,11 @@ jobs:
       - name: TypeScript type check
         run: npx tsc --noEmit
 
-      - name: Pi extension registration (jiti load + skill paths)
-        run: npx tsx tests/test_pi_integration.ts
-
-      - name: OpenClaw plugin registration
-        run: npx tsx tests/test_openclaw_integration.ts
-
       - name: dsh plugin registration
         run: npx tsx tests/test_dsh_integration.ts
 
       - name: dsh tool discovery
         run: npx tsx tests/test_dsh_discovery.ts
-
-      - name: Cross-adapter tool schema parity
-        run: npx tsx tests/test_adapter_parity.ts
 
       - name: dsh dashboard and watchlist regressions
         run: npx tsx tests/test_dsh_dashboard.ts
@@ -157,59 +130,22 @@ jobs:
       - name: dsh browser poll regression
         run: npx tsx tests/test_dsh_web_poll.ts
 
-      - name: dsh current SDK compatibility
-        run: npx tsx tests/test_dsh_sdk_compat.ts
-
-      - name: LLM host adapters (offline)
-        run: npx tsx tests/test_llm_hosts.ts
-
       - name: Large JSON input transport and cleanup
         run: npx tsx tests/test_json_input.ts
 
-      - name: Hermes plugin registration
-        run: pytest tests/test_hermes_integration.py -v
-
       - name: JS host process-tree cancellation
         run: npx tsx tests/test_process_tree.ts
-
-      - name: MCP stdio registration and cancellation
-        run: pytest tests/test_mcp_integration.py -v
-
-      - name: Run host↔python round-trip tests
-        run: pytest tests/e2e/test_host_to_python.py -v
-
-      - name: Signal store and analysis regressions
-        run: pytest tests/test_signal_tracker.py tests/test_gather.py tests/test_watchlist.py tests/test_watchlist_context.py tests/test_stateless_analysis.py -q
-
-      - name: Pi host real subprocess round-trip
-        run: npx tsx tests/e2e/test_pi_e2e.ts
-
-      - name: OpenClaw host real subprocess round-trip
-        run: npx tsx tests/e2e/test_openclaw_e2e.ts
 
       - name: dsh host real subprocess round-trip
         run: npx tsx tests/e2e/test_dsh_e2e.ts
 
   e2e-llm:
-    # Real OpenAI-compatible call. API key is a secret; URL/model can also be variables.
-    # (skipped on forks to prevent secret exposure).
-    # continue-on-error: like `network` — non-deterministic output must not
-    # block the release path (see publish.yml).
     continue-on-error: true
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        host: [hermes, pi, openclaw, dsh]
     timeout-minutes: 20
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-          cache: pip
 
       - uses: actions/setup-node@v7
         with:
@@ -221,19 +157,10 @@ jobs:
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL || vars.OPENAI_BASE_URL }}
         run: node scripts/ci-resolve-llm-host.mjs
 
-      - name: Install Python dependencies
-        if: matrix.host == 'hermes'
-        run: |
-          pip install -r tools/requirements.txt
-          pip install -r requirements-dev.txt
-
-      # Full npm ci builds .venv for the TypeScript host adapters.
       - name: Install Node dependencies
-        if: matrix.host != 'hermes'
         run: npm ci
 
-      - name: E2E — Hermes LLM flow
-        if: matrix.host == 'hermes'
+      - name: E2E — dsh LLM flow
         env:
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL || vars.OPENAI_BASE_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -243,50 +170,20 @@ jobs:
             echo "OPENAI_BASE_URL, OPENAI_API_KEY, and OPENAI_MODEL are required — skipping LLM e2e"
             exit 0
           fi
-          # Live-provider waits must not serialize fixed-evidence report evaluation.
-          pytest tests/e2e/test_hermes_llm.py -m integration_llm -v --capture=tee-sys &
-          hermes_pid=$!
-          pytest tests/e2e/test_analysis_quality.py -m integration_llm -v --capture=tee-sys &
-          quality_pid=$!
-          llm_failed=0
-          wait "$hermes_pid" || llm_failed=1
-          wait "$quality_pid" || llm_failed=1
-          exit "$llm_failed"
-
-      - name: E2E — ${{ matrix.host }} LLM flow
-        if: matrix.host != 'hermes'
-        env:
-          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL || vars.OPENAI_BASE_URL }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || vars.OPENAI_MODEL }}
-        run: |
-          if [ -z "$OPENAI_BASE_URL" ] || [ -z "$OPENAI_API_KEY" ] || [ -z "$OPENAI_MODEL" ]; then
-            echo "OPENAI_BASE_URL, OPENAI_API_KEY, and OPENAI_MODEL are required — skipping LLM e2e"
-            exit 0
-          fi
-          npx tsx tests/e2e/test_host_llm.ts ${{ matrix.host }}
+          npx tsx tests/e2e/test_host_llm.ts dsh
 
   e2e-host:
-    # Real-host smoke: install the plugin into the actual pi / openclaw /
-    # hermes / dsh runtime and run one QA turn through the host's own agent
-    # loop. This is a BLOCKING check — the smoke script retries the QA
-    # internally.
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
-    strategy:
-      fail-fast: false
-      matrix:
-        host: [pi, openclaw, hermes, dsh]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.host == 'hermes' && '3.14' || '3.11' }}
+          python-version: "3.11"
 
       - uses: actions/setup-node@v7
-        # OpenClaw 2026.11.3 requires Node >=24.16.0 <25 || >=26.1.0.
         with:
           node-version: "24"
           cache: "npm"
@@ -296,47 +193,28 @@ jobs:
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL || vars.OPENAI_BASE_URL }}
         run: node scripts/ci-resolve-llm-host.mjs
 
-      - name: Install Node dependencies (also builds repo .venv via postinstall)
+      - name: Install Node dependencies
         run: npm ci
 
-      # Pin each host release; Hermes installs its Python runtime inside host_smoke.mjs.
-      - name: Install Pi CLI
-        if: matrix.host == 'pi'
-        run: |
-          # npm registry/GitHub runner occasionally drops this download; retry once.
-          npm i -g @earendil-works/pi-coding-agent@1.5.2 || {
-            echo "Pi CLI install failed; retrying in 15s"
-            sleep 15
-            npm i -g @earendil-works/pi-coding-agent@1.5.2
-          }
-
-      - name: Install OpenClaw CLI
-        if: matrix.host == 'openclaw'
-        run: npm i -g openclaw@2026.11.3
-
       - name: Install dsh CLI and package manager
-        if: matrix.host == 'dsh'
         run: npm i -g @deepseek-ai/dsh@0.2.2-rc.1 pnpm@10
 
       - name: dsh research presets and persistent runtime (offline)
-        if: matrix.host == 'dsh'
         run: |
           npm run build:dsh
           node tests/e2e/test_dsh_research.mjs "$(npm root -g)/@deepseek-ai/dsh"
 
-      - name: Real-host smoke QA (${{ matrix.host }})
+      - name: Real-host smoke QA (dsh)
         env:
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL || vars.OPENAI_BASE_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || vars.OPENAI_MODEL }}
         run: |
           if [ -z "$OPENAI_BASE_URL" ] || [ -z "$OPENAI_API_KEY" ] || [ -z "$OPENAI_MODEL" ]; then
-            # Fork without LLM secrets: skip instead of failing. With secrets the
-            # real-host smoke below still runs and stays blocking.
-            echo "OPENAI_BASE_URL, OPENAI_API_KEY, and OPENAI_MODEL are required — skipping real-host e2e (fork without secrets)"
+            echo "OPENAI_BASE_URL, OPENAI_API_KEY, and OPENAI_MODEL are required — skipping real-host e2e"
             exit 0
           fi
-          node tests/e2e/host_smoke.mjs ${{ matrix.host }}
+          node tests/e2e/host_smoke.mjs dsh
 
   build:
     runs-on: ubuntu-latest
@@ -350,26 +228,32 @@ jobs:
           node-version: "24"
           cache: "npm"
 
-      # --ignore-scripts: packing/bundling doesn't need the Python venv
-      # (esbuild's binary arrives via optionalDependencies, not postinstall).
       - name: Install Node dependencies
         run: npm ci --ignore-scripts
 
-      # Bundle both compiled hosts here so esbuild breakage surfaces in CI
-      # instead of at tag-publish time.
-      - name: Build host bundles
-        run: |
-          npm run build:openclaw
-          npm run build:dsh
+      - name: Build dsh bundle
+        run: npm run build:dsh
 
-      - name: Verify pack contents
+      - name: Stage payload into dsh/
+        run: |
+          set -euo pipefail
+          for d in tools skills schemas templates strategies scripts; do
+            rm -rf "dsh/$d"
+            cp -R "$d" "dsh/$d"
+          done
+          rm -f dsh/scripts/sync-version.sh
+          cp LICENSE dsh/LICENSE
+
+      - name: Verify dsh pack contents
+        working-directory: dsh
         run: npm pack --dry-run
 
-      - name: Build package
+      - name: Pack dsh bundle
+        working-directory: dsh
         run: npm pack
 
       - uses: actions/upload-artifact@v7
         with:
-          name: package-tarball
-          path: "*.tgz"
+          name: dsh-package-tarball
+          path: dsh/*.tgz
           retention-days: 7

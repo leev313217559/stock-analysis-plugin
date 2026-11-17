@@ -29,16 +29,15 @@ node_modules/
 !tests/fixtures/contracts/
 !tests/fixtures/contracts/*.json
 !tests/fixtures/tool-search-cases.json
+!tests/fixtures/dsh-tool-names.json
 !package.json
 !package-lock.json
 !tsconfig.json
 !schemas/**/*.json
 !tools/cli_budgets.json
-!tools/tool_schemas.json
 !tests/fixtures/analysis_quality.json
 !tests/fixtures/stateless_analysis.json
 !tests/fixtures/trend_temperature.json
-!openclaw/openclaw.plugin.json
 !strategies/**/*.yaml
 
 # Env
@@ -58,14 +57,6 @@ coverage.xml
 # MCP config (contains API keys)
 .mcp.json
 
-# OpenClaw staged publish payload (see publish.yml "Stage payload into openclaw/")
-openclaw/tools/
-openclaw/skills/
-openclaw/schemas/
-openclaw/templates/
-openclaw/strategies/
-openclaw/scripts/
-openclaw/*.tgz
 
 # dsh staged publish payload (see publish.yml "Stage payload into dsh/")
 dsh/tools/

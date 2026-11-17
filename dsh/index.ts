@@ -52,7 +52,7 @@ async function runPy(script: string, args: string[], timeoutMs?: number, signal?
 }
 
 // One canonical stdout contract shared by every tool: execute returns the
-// CLI's raw JSON text (same relay shape as the pi/openclaw adapters), render
+// CLI's raw JSON text, render
 // relays it to the model as a single text block.
 const textOutput = {
   schema: { type: "string" as const },

@@ -1,8 +1,4 @@
-// Layer 3 e2e: LLM → tool_use → Pi / OpenClaw / dsh adapter → real Python → answer.
-//
-// Same agentic loop as tests/e2e/test_hermes_llm.py but exercises the TypeScript
-// host-specific tool executors. Only meaningful difference vs Hermes is
-// the tool-call path — the LLM prompt/protocol is identical.
+// Layer 3 e2e: LLM → tool_use → dsh adapter → real Python → answer.
 //
 // Requires OPENAI_BASE_URL, OPENAI_API_KEY, and OPENAI_MODEL.
 
@@ -10,7 +6,7 @@ import { loadLLMHost, timedStage } from "./llm-host.js";
 import OpenAI from "openai";
 
 const host = process.argv[2] ?? "pi";
-if (!["pi", "openclaw", "dsh"].includes(host)) throw new Error("Expected pi, openclaw or dsh");
+if (host !== "dsh") throw new Error("Expected dsh");
 
 const apiKey = process.env.OPENAI_API_KEY;
 const baseURL = process.env.OPENAI_BASE_URL;

@@ -18,14 +18,13 @@ jobs:
           cache: pip
 
       - name: Install ruff
-        # Pinned — must match ci.yml and requirements-dev.txt.
         run: pip install "ruff==0.15.20"
 
       - name: Ruff auto-fix (lint)
-        run: ruff check --fix tools/ skills/ tests/ hermes/ mcp_host/
+        run: ruff check --fix tools/ skills/ tests/
         continue-on-error: true
 
       - name: Ruff format
-        run: ruff format tools/ skills/ tests/ hermes/ mcp_host/
+        run: ruff format tools/ skills/ tests/
 
       - uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a

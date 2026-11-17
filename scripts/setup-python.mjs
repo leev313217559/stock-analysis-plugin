@@ -88,7 +88,7 @@ try {
   }
 } catch (err) {
   console.warn(
-    `\n[pi-stock-analysis] Python setup failed: ${err.message}\n` +
+    `\n[stock-analysis] Python setup failed: ${err.message}\n` +
     "You can manually create the venv and install tools/requirements.txt with your platform's python.\n"
   );
   process.exit(1);

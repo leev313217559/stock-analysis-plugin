@@ -1,10 +1,11 @@
 import { rotationRequests } from "../fixtures/rotation";
-import { readFileSync as readAnalysisFixture } from "node:fs";
+import { mkdtempSync, readFileSync as readAnalysisFixture, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 // Layer 1 e2e: dsh host → real Python subprocess → JSON round-trip.
 //
 // dsh/index.ts already exposes __setExecutor for tests. We do NOT call it
 // here — the default executor spawns real python. Same 4 non-network tools
-// as the pi/openclaw e2e.
+// as the shared CLI round-trip.
 
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -100,12 +101,18 @@ console.log("dsh e2e host→python round-trip");
 // Provider/config errors exit nonzero but carry a safe JSON error on stdout.
 {
   const previousIdentity = process.env.SEC_USER_AGENT;
+  const previousEnvFile = process.env.STOCK_ANALYSIS_ENV_FILE;
+  const emptyEnv = new URL(`file://${mkdtempSync(`${tmpdir()}/dsh-e2e-env-`)}/empty.env`);
+  writeFileSync(emptyEnv, "");
   delete process.env.SEC_USER_AGENT;
+  process.env.STOCK_ANALYSIS_ENV_FILE = emptyEnv.pathname;
   try {
     const out = await callTool("get_us_holdings", { cik: "1067983" });
     assert(typeof out.error === "string" && out.error.includes("SEC_USER_AGENT"), "SEC config error must reach the host as JSON");
   } finally {
     if (previousIdentity !== undefined) process.env.SEC_USER_AGENT = previousIdentity;
+    if (previousEnvFile === undefined) delete process.env.STOCK_ANALYSIS_ENV_FILE;
+    else process.env.STOCK_ANALYSIS_ENV_FILE = previousEnvFile;
   }
 }
 

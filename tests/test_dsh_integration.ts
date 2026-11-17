@@ -4,9 +4,7 @@
 // (defineTool is identity, so the options object is captured verbatim).
 // Verifies:
 //   - the plugin exports the cordis function-plugin form (name/inject/apply)
-//   - all 74 tools register, aligned with the canonical cross-host tool list
-//     (openclaw.plugin.json contracts.tools — the repo invariant says every
-//     host exposes the same set)
+//   - all 74 tools register, aligned with the dsh tool-name fixture
 //   - the dsh bundle manifest (package.json dsh.bundle.patch + cordis.patch.yml)
 //     is wired for the profile loader
 //   - every tool's execute() dispatches to a tools/*.py CLI (stubbed executor)
@@ -104,11 +102,10 @@ assert(
 );
 
 console.log("Tools registered:");
-const canonical = JSON.parse(
-  readFileSync(join(repoRoot, "openclaw/openclaw.plugin.json"), "utf8")
-) as { contracts: { tools: string[] } };
+const canonicalNames = (
+  JSON.parse(readFileSync(join(repoRoot, "tests/fixtures/dsh-tool-names.json"), "utf8")) as string[]
+).sort();
 const registeredNames = tools.map((t) => t.name).sort();
-const canonicalNames = [...canonical.contracts.tools].sort();
 
 const missingFromCode = canonicalNames.filter((n) => !registeredNames.includes(n));
 const extraInCode = registeredNames.filter((n) => !canonicalNames.includes(n));

@@ -6,11 +6,9 @@ import { join } from "node:path";
 
 const isWin = process.platform === "win32";
 
-// OpenClaw captures package source, including .venv symlinks; node_modules is excluded.
+// The Python environment lives inside the installed plugin package.
 export function pythonEnvironmentRoot(rootDir) {
-  return existsSync(join(rootDir, "openclaw.plugin.json"))
-    ? join(rootDir, "node_modules", ".stock-analysis-python")
-    : rootDir;
+  return rootDir;
 }
 
 // Windows venvs ship Scripts/python.exe (there is no python3); POSIX venvs ship bin/python3.

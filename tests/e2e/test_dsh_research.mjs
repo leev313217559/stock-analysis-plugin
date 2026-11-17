@@ -11,7 +11,7 @@ const pkg = async n => import(pathToFileURL(require.resolve(n)).href);
 const { parse } = require("yaml");
 const overlay = parse(readFileSync(new URL("../../dsh/research.patch.yml", import.meta.url), "utf8"));
 const definitions = overlay.find(row => row.insert).insert;
-const manifest = JSON.parse(readFileSync(new URL("../../openclaw/openclaw.plugin.json", import.meta.url), "utf8"));
+const toolNames = JSON.parse(readFileSync(new URL("../fixtures/dsh-tool-names.json", import.meta.url), "utf8"));
 const { Context } = await pkg('@deepseek-ai/cordis');
 const { default: Loader } = await pkg('@deepseek-ai/cordis-plugin-loader');
 const { default: Group } = await pkg('@deepseek-ai/cordis-plugin-group');
@@ -33,7 +33,7 @@ try {
     await ctx.plugin(module.default ?? module, config);
   }
 
-  const names = [...manifest.contracts.tools, "host_write"];
+  const names = [...toolNames, "host_write"];
   for (const name of names) ctx.tools.register(defineTool({
     name, description: name, parameters: {},
     output: { schema: { type: "string" }, render: (_a, value) => [{ type: "text", text: value }] },

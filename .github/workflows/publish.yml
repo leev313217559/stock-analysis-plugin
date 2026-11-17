@@ -6,180 +6,9 @@ on:
       - "v*"
 
 jobs:
-  # ci is a whole-workflow reusable call — a caller cannot `needs` individual
-  # jobs inside it, so the flaky jobs (network, e2e-llm) carry job-level
-  # `continue-on-error: true` in ci.yml to keep them off the release path.
   ci:
     uses: ./.github/workflows/ci.yml
     secrets: inherit
-
-  publish-npm:
-    runs-on: ubuntu-latest
-    needs: ci
-    permissions:
-      contents: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Sync version from tag
-        run: bash scripts/sync-version.sh
-
-      # --ignore-scripts: publishing only packs and uploads — no Python venv.
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Build and verify
-        run: npm pack --dry-run
-
-      - name: Publish to npm
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish unscoped variant to npm
-        # Same payload under the unscoped name; users may install either.
-        run: |
-          npm pkg set name=stock-analysis-plugin
-          npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  publish-pypi:
-    runs-on: ubuntu-latest
-    needs: ci
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-
-      - name: Sync version from tag
-        run: bash scripts/sync-version.sh
-
-      - name: Install build tools
-        run: pip install build
-
-      - name: Build package
-        run: python -m build
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_TOKEN }}
-
-  publish-openclaw:
-    runs-on: ubuntu-latest
-    needs: ci
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Sync version from tag
-        run: bash scripts/sync-version.sh
-
-      # --ignore-scripts: publishing only packs and uploads — no Python venv.
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Build compiled plugin entry (dist/index.js)
-        run: npm run build:openclaw
-
-      - name: Stage payload into openclaw/
-        run: |
-          set -euo pipefail
-          for d in tools skills schemas templates strategies scripts; do
-            if [ -d "$d" ]; then
-              rm -rf "openclaw/$d"
-              cp -R "$d" "openclaw/$d"
-            fi
-          done
-          rm -f openclaw/scripts/sync-version.sh
-          cp LICENSE openclaw/LICENSE
-
-      # Guard against regression of the issue behind
-      # https://github.com/Weaxs/stock-analysis-plugin/issues/3 — a TS entry
-      # (./index.ts) with no compiled sibling makes registry installs fail.
-      # The two publish paths ship dist/index.js differently, so assert both:
-      #   - npm:     dist must survive the `files` whitelist into the tarball.
-      #   - clawhub: it ships the ./openclaw directory, so dist must exist on disk.
-      - name: Verify compiled entry is packaged
-        working-directory: openclaw
-        run: |
-          npm pack --dry-run 2>&1 | tee pack-dry-run.txt
-          grep -q "dist/index.js" pack-dry-run.txt \
-            || { echo "::error::dist/index.js missing from openclaw npm tarball — build ran but files whitelist excludes dist/"; exit 1; }
-          grep -q "LICENSE" pack-dry-run.txt \
-            || { echo "::error::LICENSE missing from openclaw npm tarball"; exit 1; }
-          test -f dist/index.js \
-            || { echo "::error::openclaw/dist/index.js missing on disk — clawhub publish would ship no compiled entry"; exit 1; }
-
-      - name: Install clawhub CLI
-        # Pinned — an unpinned clawhub@latest broke a release before; bump deliberately.
-        run: npm i -g clawhub@0.23.3
-
-      - name: npm publish
-        working-directory: openclaw
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Authenticate clawhub CLI
-        run: clawhub login --token "$CLAWHUB_TOKEN" --no-input
-        env:
-          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
-
-      # ClawHub still registers this package as bundle-plugin. Since the
-      # registry tightened bundle validation (openclaw/clawhub#4031), that family
-      # needs a bundle manifest we don't ship, and family changes need an admin
-      # repair (openclaw/clawhub#4086, #4100). Until the row is migrated to
-      # code-plugin, a ClawHub failure must not block the npm twin or the
-      # GitHub release.
-      - name: Publish to ClawHub (dry-run)
-        id: clawhub-dry-run
-        continue-on-error: true
-        run: clawhub package publish ./openclaw --family bundle-plugin --dry-run
-
-      - name: Publish to ClawHub
-        id: clawhub-publish
-        if: steps.clawhub-dry-run.outcome == 'success'
-        continue-on-error: true
-        run: clawhub package publish ./openclaw --family bundle-plugin
-
-      - name: Warn when ClawHub was skipped
-        if: steps.clawhub-publish.outcome != 'success'
-        run: echo "::warning::ClawHub publish did not complete; the registry row still needs the bundle-plugin -> code-plugin repair (openclaw/clawhub#4086)"
-
-      - name: Publish unscoped variant to npm
-        # Same payload under the unscoped name. Runs after ClawHub so the
-        # manifest-facing name stays scoped for the clawhub publish.
-        working-directory: openclaw
-        run: |
-          npm pkg set name=openclaw-stock-analysis
-          npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-dsh:
     runs-on: ubuntu-latest
@@ -198,7 +27,6 @@ jobs:
       - name: Sync version from tag
         run: bash scripts/sync-version.sh
 
-      # --ignore-scripts: publishing only packs and uploads — no Python venv.
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
@@ -217,23 +45,18 @@ jobs:
           rm -f dsh/scripts/sync-version.sh
           cp LICENSE dsh/LICENSE
 
-      # Same regression guard as the OpenClaw job: the dsh profile loader
-      # imports built JS, so dist must survive the `files` whitelist, and the
-      # bundle manifest must ship its patch file.
       - name: Verify compiled entry and patch are packaged
         working-directory: dsh
         run: |
           npm pack --dry-run 2>&1 | tee pack-dry-run.txt
           grep -q "dist/index.js" pack-dry-run.txt \
-            || { echo "::error::dist/index.js missing from dsh npm tarball — build ran but files whitelist excludes dist/"; exit 1; }
+            || { echo "::error::dist/index.js missing from dsh npm tarball"; exit 1; }
           grep -q "cordis.patch.yml" pack-dry-run.txt \
-            || { echo "::error::cordis.patch.yml missing from dsh npm tarball — dsh bundle manifest would dangle"; exit 1; }
+            || { echo "::error::cordis.patch.yml missing from dsh npm tarball"; exit 1; }
           for file in dist/research-role.js dist/client.js dist/web/index.html dist/web/app.js dist/web/style.css research.patch.yml deepseek-search.patch.yml; do
-            grep -q "$file" pack-dry-run.txt \
-              || { echo "::error::$file missing from dsh npm tarball"; exit 1; }
+            grep -q "$file" pack-dry-run.txt || { echo "::error::$file missing from dsh npm tarball"; exit 1; }
           done
-          grep -q "LICENSE" pack-dry-run.txt \
-            || { echo "::error::LICENSE missing from dsh npm tarball"; exit 1; }
+          grep -q "LICENSE" pack-dry-run.txt || { echo "::error::LICENSE missing from dsh npm tarball"; exit 1; }
 
       - name: npm publish
         working-directory: dsh
@@ -242,14 +65,11 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish unscoped variant to npm
-        # The bundle manifest references the plugin by package name, so the
-        # unscoped variant's patch and browser module id must name the unscoped
-        # package — otherwise a profile installing it would resolve the scoped name
-        # at boot and fail. README already documents the unscoped name first.
         working-directory: dsh
         run: |
+          PKG="$(node -p "require('./package.json').name")"
           npm pkg set name=dsh-stock-analysis
-          sed -i 's|@weaxs/dsh-stock-analysis|dsh-stock-analysis|g' cordis.patch.yml research.patch.yml dist/client.js
+          sed -i "s|$PKG|dsh-stock-analysis|g" cordis.patch.yml research.patch.yml dist/client.js
           grep -q 'name: "dsh-stock-analysis"' cordis.patch.yml
           grep -q 'id: "dsh-stock-analysis"' dist/client.js
           npm publish --access public --provenance
@@ -258,7 +78,7 @@ jobs:
 
   github-release:
     runs-on: ubuntu-latest
-    needs: [publish-npm, publish-pypi, publish-openclaw, publish-dsh]
+    needs: [publish-dsh]
     permissions:
       contents: write
     steps:
@@ -274,23 +94,15 @@ jobs:
           ---
           ### Install
 
-          - **npm**: \`npm install @weaxs/stock-analysis-plugin@${VERSION}\`
-          - **pip**: \`pip install stock-analysis-plugin==${VERSION}\`
-          - **OpenClaw**: \`openclaw plugins install clawhub:@weaxs/openclaw-stock-analysis\`
-          - **dsh**: \`dsh plugin --profile <name> add @weaxs/dsh-stock-analysis\`
-          - 非 scoped 同名变体（内容一致）：\`stock-analysis-plugin\` / \`openclaw-stock-analysis\` / \`dsh-stock-analysis\`
+          - **dsh**: \`dsh plugin --profile <name> add dsh-stock-analysis@${VERSION}\`
+          - scoped variant: \`@leev313217559/dsh-stock-analysis\`
           EOF
 
       - name: Create GitHub Release
-        # --generate-notes uses .github/release.yml for PR categorization and
-        # automatically appends author @mentions, PR numbers, and a Full
-        # Changelog compare link. We append our install footer via --notes-file
-        # after the fact, since --generate-notes and --notes-file are exclusive.
         run: |
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
             --generate-notes
-          # Fetch the generated body, append install footer, update the release
           GENERATED=$(gh release view "${GITHUB_REF_NAME}" --json body --jq .body)
           {
             echo "$GENERATED"

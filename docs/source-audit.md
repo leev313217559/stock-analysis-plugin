@@ -11,7 +11,7 @@ removals), **Phase 3 done** (contract fixtures). Production defaults to
 | Market data providers | tencent, sina, eastmoney (push2/datacenter/emweb), cninfo, csindex, legulegu, hkex, sse, szse, sec.gov, yfinance | keyless or account/cookie based; rename/rate-limit/HTML-challenge risk |
 | Keyed providers | tushare, longbridge, finnhub, alphavantage, lixinger, xueqiu | optional; fail fast when the key is absent |
 | Search/sentiment | tavily, searxng, adanos, eastmoney guba, xueqiu | key/self-host; RSS/JSON drift |
-| Protocols | HTTP JSON, HTML/JS pages, MCP stdio, CLI stdout JSON, DSH tool schema, OpenAI-compatible API | own protocols are stable; third-party pages are not |
+| Protocols | HTTP JSON, HTML/JS pages, dsh tool schema, CLI stdout JSON, OpenAI-compatible API | own protocols are stable; third-party pages are not |
 | Runtimes/packages | Python 3.10/3.11, Node 24, akshare/yfinance/pandas, DSH/hosts | drift handled by compat shims + Dependabot |
 | Upstream code | Weaxs repository | merged, reviewed, never trusted blindly |
 
@@ -52,15 +52,14 @@ removals), **Phase 3 done** (contract fixtures). Production defaults to
 - **TIAA / youzhiyouxing removed**: `tiaa_disclosures.py` deleted, the TIAA quote
   path and adapter descriptions dropped, tests removed.
 - **adanos restored** (decision 2026-11-16): HK/US social sentiment and the
-  `get_trending_sentiment` tool are back in all four adapters, and
-  `SENTIMENT_API_URL` / `SENTIMENT_API_KEY` are documented again (73 tools).
+  `get_trending_sentiment` tool are back in the dsh adapter, and
+  `SENTIMENT_API_URL` / `SENTIMENT_API_KEY` are documented again (74 tools).
 - **Search engines**: kept Tavily + SearXNG; Brave / Bocha / SerpAPI clients and
   their env vars were removed.
 - **Xueqiu kept and wired**: `_xueqiu_heat` reads `XUEQIU_TOKEN` (skips the request
   without it); industry fallback was already token-gated.
 - **Northbound** stays as a historical series with its existing disclosure note.
-- Verification: `pytest` 2169 passed; adapter parity 73 tools; DSH/Pi/OpenClaw
-  integration tests pass.
+- Verification: dsh-only test suite passes; the dsh adapter registers 74 tools.
 
 ## Decisions (resolved)
 

@@ -49,7 +49,7 @@ allowBuilds:
 
 数据由插件后台常驻预热：Web 路由注册后即开始按固定任务表调用现有 CLI（`stock_data.py quote/market_indices/kline/sector_rankings/market_stats` 与 `trading_calendar.py phase`），最多 4 个 Python 进程按优先级排队（报价 > 指数 > 走势 > 行业/统计），结果留在内存缓存。刷新节奏随各市场交易阶段变化：交易时段有页面打开时报价与指数约 30 秒、行业 1 分钟、全 A 统计 2 分钟；无人查看时放宽到 5–10 分钟；收盘后 30–60 分钟一次。失败保留上次成功值并标注，重试间隔按 1、2、4… 分钟退避。页面只轮询内存快照 `/api/snapshot`（有后台任务时 1.5 秒，否则 15 秒，页面不可见时停止），并在浏览器本地缓存 24 小时，打开即显示上次数据；「刷新」会让所有数据立即重新获取。不调用包含财务、新闻、风险等完整采集的 `run_watchlist_analysis`。前端接口只接受固定的快照、刷新和自选股操作，不开放任意 Python 脚本或参数。
 
-前端由 `dsh/client.ts`、`dsh/dashboard.ts` 和 `dsh/web/`（`app.ts` + HTML/CSS）组成，均为 TypeScript，`npm run build:dsh` 将浏览器端编译为 IIFE 输出到 `dist/`；它不增加或改变四宿主共享的 74 个模型工具。源码或 manifest 改动后重新运行 `npm run build:dsh` 并重装/重启对应 profile。
+前端由 `dsh/client.ts`、`dsh/dashboard.ts` 和 `dsh/web/`（`app.ts` + HTML/CSS）组成，均为 TypeScript，`npm run build:dsh` 将浏览器端编译为 IIFE 输出到 `dist/`；它不增加或改变 dsh 的 74 个模型工具。源码或 manifest 改动后重新运行 `npm run build:dsh` 并重装/重启对应 profile。
 
 ## 按需工具发现
 
@@ -65,7 +65,7 @@ dsh 0.2.2 及以上（工具注册支持按步骤的 `when` 条件）默认增�
     toolDiscovery: false
 ```
 
-这里的 `stock_tool_search` 是 dsh 适配器的目录控制工具，作用类似 Pi/Hermes/OpenClaw 的宿主发现入口，不增加共享 Python 分析能力，也不执行分析。
+这里的 `stock_tool_search` 是 dsh 适配器的目录控制工具，只控制工具加载，不增加 Python 分析能力，也不执行分析。
 
 调用顺序：核心工具已常驻；**其余工具必须先通过 `stock_tool_search` 加载**，未加载直接调用会返回 `unknown tool`。一次搜索可以命中多个工具（`limit` 最多 20），加载后在下一次模型请求按原名调用。
 
