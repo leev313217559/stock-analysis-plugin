@@ -7,11 +7,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Context } from "@deepseek-ai/cordis";
-import {
-  defineTool,
-  type InferArgs,
-  type ParameterSchemaSpec,
-} from "@deepseek-ai/dsh-tools";
+import { defineTool, type InferArgs, type ParameterSchemaSpec } from "@deepseek-ai/dsh-tools";
 // Type-only import: pulls in the `Context.skills` service augmentation.
 import type {} from "@deepseek-ai/dsh-skill";
 import { resolvePython, venvPythonPath } from "../scripts/venv-python.mjs";
