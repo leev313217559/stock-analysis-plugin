@@ -22,6 +22,7 @@ interface ThemeContext {
 }
 
 interface ClientContext {
+  get(name: "pluginNavigation"): { openBundle?(packageName: string): void } | undefined;
   inject(deps: ["theme"], callback: (ctx: ThemeContext) => void): void;
   slots: {
     inject(name: string, callback: () => unknown): void;
@@ -44,6 +45,7 @@ window.__ModuleLoader__.load({
     const h = React.createElement;
     const PANEL = "stock-analysis";
     const SRC = "/stock-analysis/";
+    const BUNDLE = "@leev313217559/dsh-stock-analysis";
 
     function StockIcon(props?: { size?: number }) {
       const size = props?.size ?? 18;
@@ -78,11 +80,24 @@ window.__ModuleLoader__.load({
             .filter(([, value]) => value),
         );
       };
-      const post = (frame: HTMLIFrameElement) => {
-        if (scheme && frame.contentWindow) {
-          frame.contentWindow.postMessage({ type: "stock-analysis:theme", scheme, palette: palette() }, location.origin);
+      const pluginPage = () => {
+        try {
+          const navigation = ctx.get("pluginNavigation");
+          return typeof navigation?.openBundle === "function" ? navigation : null;
+        } catch {
+          return null;
         }
       };
+      const post = (frame: HTMLIFrameElement) => {
+        if (scheme && frame.contentWindow) {
+          frame.contentWindow.postMessage({ type: "stock-analysis:theme", scheme, palette: palette(), pluginPage: Boolean(pluginPage()) }, location.origin);
+        }
+      };
+      window.addEventListener("message", (event: MessageEvent<{ type?: string }>) => {
+        if (event.origin !== location.origin || event.data?.type !== "stock-analysis:open-plugin") return;
+        if (![...frames].some(frame => frame.contentWindow === event.source)) return;
+        pluginPage()?.openBundle?.(BUNDLE);
+      });
       ctx.inject(["theme"], c => {
         const push = (snapshot: ThemeSnapshot) => {
           scheme = snapshot.active.colorScheme;

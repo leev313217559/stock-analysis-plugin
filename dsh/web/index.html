@@ -18,6 +18,10 @@
       </div>
       <p id="status" class="status" role="status" aria-live="polite">正在连接行情服务…</p>
       <div class="bar-actions">
+        <a id="update" class="update-pill" href="https://github.com/leev313217559/stock-analysis-plugin/releases/latest" target="_blank" rel="noreferrer" hidden>
+          <span class="update-label">新版本</span>
+          <span id="update-version" class="update-version"></span>
+        </a>
         <button id="refresh" class="btn ghost" type="button" title="立即刷新全部行情">
           <svg class="refresh-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6v5h-5"/><path d="M18.4 15a7 7 0 1 1-.8-7.8L20 9"/></svg>
           <span>刷新</span>
@@ -82,7 +86,7 @@
       <div id="market-body" class="market-body" role="tabpanel" aria-labelledby="market-heading"></div>
     </section>
 
-    <footer class="foot">报价可能延迟；悬停自选股名称可查看来源与报价时间，指数 tile 的延迟徽标可查看延迟。交易时段且有页面打开时，自选股/指数报价约每 30 秒刷新；分时图 A 股/港股约每 1 分钟、其他市场约每 3 分钟；无页面时后台约每 5 分钟预热报价。自选股为 120 日收盘走势；指数区为当日分时 + 120 日图，包含当天盘中数据。</footer>
+    <footer class="foot">报价可能延迟；悬停自选股名称可查看来源与报价时间，指数 tile 的延迟徽标可查看延迟。交易时段且有页面打开时，自选股/指数报价约每 30 秒刷新；分时图 A 股/港股约每 1 分钟、其他市场约每 3 分钟；无页面时后台约每 5 分钟预热报价。自选股为 120 日收盘走势；指数区为当日分时 + 120 日图，包含当天盘中数据。<span id="version"></span></footer>
   </div>
   <div id="settings-modal" class="modal" hidden>
     <div class="modal-backdrop" data-close-settings></div>

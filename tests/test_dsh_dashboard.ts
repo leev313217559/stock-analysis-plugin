@@ -10,6 +10,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   createDashboardHandler,
   dashboardQuoteSymbol,
+  installedPlugin,
+  isNewerVersion,
   normalizeWatchlist,
   readWatchlist,
   symbolRegion,
@@ -543,6 +545,16 @@ try {
   const unscopedClient = clientSource.replaceAll(pkg.name, "dsh-stock-analysis");
   assert(unscopedClient.includes('id: "dsh-stock-analysis"'), "the unscoped bundle must register the unscoped client id");
   assert(!unscopedClient.includes(`id: "${pkg.name}"`), "the scoped id must not remain after the twin rewrite");
+
+  // ---------- version/update hint ----------
+  assert.equal(isNewerVersion("0.2.13", "0.2.12"), true);
+  assert.equal(isNewerVersion("0.2.12", "0.2.12"), false);
+  assert.equal(isNewerVersion("0.2.9", "0.2.12"), false);
+  assert.equal(isNewerVersion("next", "0.2.12"), false);
+  const installed = installedPlugin(join(repoRoot, "dsh"));
+  assert(installed, "installedPlugin reads dsh/package.json");
+  assert.equal(installed.name, JSON.parse(readFileSync(join(repoRoot, "dsh", "package.json"), "utf8")).name);
+  assert.equal(installed.latest, undefined, "source checkout does not query npm");
 
   console.log("dsh dashboard: snapshot, warmer freshness, failures, watchlist, security, assets, and package manifest passed");
 } finally {

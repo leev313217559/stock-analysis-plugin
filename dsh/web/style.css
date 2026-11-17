@@ -413,3 +413,10 @@ body.modal-open { overflow: hidden; }
 .session-inline .session-label { color: var(--text); font-weight: 650; }
 .session-inline .session-item { font-variant-numeric: tabular-nums; }
 .session-inline .session-item strong { color: var(--text); font-weight: 600; }
+
+/* plugin version / update hint */
+.foot #version:not(:empty)::before { content: " · "; }
+.update-pill { align-self: center; display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-subtle); color: inherit; font-size: 12px; text-decoration: none; white-space: nowrap; transition: border-color .16s ease; }
+.update-pill:hover { border-color: var(--warn); }
+.update-label { color: var(--muted); }
+.update-version { color: var(--warn); font-weight: 600; font-variant-numeric: tabular-nums; }
