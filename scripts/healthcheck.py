@@ -134,15 +134,24 @@ def check_market_stats(data) -> tuple[str, dict]:
     total = data.get("total_stocks")
     up, down, flat = data.get("up_count"), data.get("down_count"), data.get("flat_count")
     problems = []
+    warnings = []
     if not _num(total) or total < 1000:
         problems.append(f"total_stocks={total}")
     if not all(_num(v) for v in (up, down, flat)):
         problems.append("up/down/flat counts missing")
-    elif abs((up + down + flat) - total) > max(10, total * 0.01):
-        problems.append(f"breadth mismatch: {up}+{down}+{flat} != {total}")
+    elif up + down + flat > total:
+        problems.append(f"breadth exceeds total: {up}+{down}+{flat} > {total}")
+    elif total - (up + down + flat) > max(10, total * 0.01):
+        # Suspended/newly listed rows can have no change_pct. That is a data-quality
+        # warning, not a hard failure, as long as the covered rows are consistent.
+        warnings.append(f"unpriced rows: {total - (up + down + flat)} of {total}")
     if not _num(data.get("total_turnover")) or data["total_turnover"] <= 0:
         problems.append("total_turnover missing")
-    return ("fail", {"problems": problems}) if problems else ("ok", {"total": total})
+    if problems:
+        return "fail", {"problems": problems}
+    if warnings:
+        return "warn", {"total": total, "warnings": warnings}
+    return "ok", {"total": total}
 
 
 def check_fund_flow(data) -> tuple[str, dict]:
