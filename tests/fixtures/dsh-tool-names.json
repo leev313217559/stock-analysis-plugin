@@ -23,6 +23,7 @@
   "extract_article",
   "get_announcements",
   "get_capital_flow",
+  "get_cds_index",
   "get_chip_distribution",
   "get_dividends",
   "get_dragon_tiger",

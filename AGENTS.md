@@ -5,7 +5,7 @@ A dsh-only stock analysis plugin: one Python CLI core, one dsh adapter, and a lo
 ## Architecture
 
 - `tools/*.py` — the single source of truth for stock data and calculations. Every tool prints JSON on stdout.
-- `dsh/index.ts` — dsh Cordis plugin. Registers 74 tools via `defineTool`; each tool carries inline `keywords` for discovery and dispatches to a `tools/*.py` CLI with argv, never a shell.
+- `dsh/index.ts` — dsh Cordis plugin. Registers 75 tools via `defineTool`; each tool carries inline `keywords` for discovery and dispatches to a `tools/*.py` CLI with argv, never a shell.
 - `dsh/discovery.ts` — on-demand `stock_tool_search`; core tools stay eager, aliases are derived from inline keywords.
 - `dsh/dashboard.ts` + `dsh/web/` — local-only dashboard server and browser UI.
 - `skills/*/SKILL.md` — 21 methodology/workflow skills registered by the dsh adapter.

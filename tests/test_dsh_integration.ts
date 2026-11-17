@@ -4,7 +4,7 @@
 // (defineTool is identity, so the options object is captured verbatim).
 // Verifies:
 //   - the plugin exports the cordis function-plugin form (name/inject/apply)
-//   - all 74 tools register, aligned with the dsh tool-name fixture
+//   - all 75 tools register, aligned with the dsh tool-name fixture
 //   - the dsh bundle manifest (package.json dsh.bundle.patch + cordis.patch.yml)
 //     is wired for the profile loader
 //   - every tool's execute() dispatches to a tools/*.py CLI (stubbed executor)

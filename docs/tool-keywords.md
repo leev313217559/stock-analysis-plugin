@@ -3,7 +3,7 @@
 > 此文件由 `node scripts/export-tool-keywords.mjs` 从 `dsh/index.ts` 生成，**不是源数据**。
 > 关键词的唯一维护点是每个工具定义中的 `keywords` 字段；不要直接编辑本文件。
 
-共 74 个工具。
+共 75 个工具。
 
 | 工具 | 关键词 |
 |---|---|
@@ -31,6 +31,7 @@
 | `extract_article` | 正文提取、文章提取、PDF提取、公告全文、网页正文、extract article、full text、全文、研报、网页、链接 |
 | `get_announcements` | 公告、披露、巨潮、SEC公告、8-K、10-K、年报、季报、filing、announcement、最新公告、公告查询、巨潮资讯、财报公告、业绩公告、港股公告、HKEX |
 | `get_capital_flow` | 资金流、主力资金、超大单、大单、净流入、板块资金流、capital flow、money flow、资金流向、主力动向、抢筹、出逃、大单净额、资金进出、净卖出、smart money |
+| `get_cds_index` | CDS、信用风险、信用利差、CDX、iTraxx、信用违约互换、credit spread、credit risk、民企CDS、高等级CDS |
 | `get_chip_distribution` | 筹码、筹码分布、成本分布、获利比例、成本集中度、chip distribution、获利盘、套牢盘、筹码峰、成本线、筹码集中度 |
 | `get_dividends` | 分红、股息、除息、派息、股息率、dividend、dividend yield、除权除息、分红记录、连续分红、派息率、分红方案、除息日、股息政策 |
 | `get_dragon_tiger` | 龙虎榜、上榜、净买额、游资、dragon tiger、top list、席位、营业部、净买入、打板、龙虎榜数据、上榜原因、资金席位、游资动向 |
