@@ -537,7 +537,7 @@ stock-analysis/
 ├── dsh/                             # DeepSeek Harness (dsh) Plugin
 │   ├── cordis.patch.yml             #   bundle patch（insert 插件入口）
 │   ├── package.json                 #   dsh.bundle + dsh.client manifest
-│   ├── index.ts                     #   cordis apply(ctx) + 内联 defineTool ×73（含关键词发现）
+│   ├── index.ts                     #   cordis apply(ctx) + 内联 defineTool ×74（含关键词发现）
 │   ├── dashboard.ts                 #   后台预热缓存 + 快照/自选股 HTTP API 与持久化
 │   ├── client.ts                    #   侧栏入口 + 主面板 + 主题同步（编译为 dist/client.js）
 │   └── web/                         #   仪表盘页面（app.ts 编译为 dist/web/app.js）
