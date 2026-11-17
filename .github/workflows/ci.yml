@@ -302,7 +302,13 @@ jobs:
       # Pin each host release; Hermes installs its Python runtime inside host_smoke.mjs.
       - name: Install Pi CLI
         if: matrix.host == 'pi'
-        run: npm i -g @earendil-works/pi-coding-agent@1.5.2
+        run: |
+          # npm registry/GitHub runner occasionally drops this download; retry once.
+          npm i -g @earendil-works/pi-coding-agent@1.5.2 || {
+            echo "Pi CLI install failed; retrying in 15s"
+            sleep 15
+            npm i -g @earendil-works/pi-coding-agent@1.5.2
+          }
 
       - name: Install OpenClaw CLI
         if: matrix.host == 'openclaw'
