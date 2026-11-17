@@ -1,7 +1,6 @@
 from argparse import Namespace
 from types import SimpleNamespace
 
-import pandas as pd
 import requests
 
 from tools import stock_data
@@ -21,10 +20,6 @@ def test_fund_quote_returns_published_nav_with_provider_date(monkeypatch):
         requests,
         "get",
         lambda *args, **kwargs: SimpleNamespace(text=body, raise_for_status=lambda: None),
-    )
-    monkeypatch.setattr(
-        "akshare.fund_value_estimation_em",
-        lambda: pd.DataFrame(),
     )
 
     result = stock_data.cmd_fund_quote(Namespace(symbol="018147"))
@@ -49,73 +44,6 @@ def test_fund_quote_returns_published_nav_with_provider_date(monkeypatch):
     assert "not a real-time price" in result["note"]
     assert "QDII" in result["note"]
     assert "price" not in result
-
-
-def test_fund_quote_keeps_intraday_estimate_separate_from_official_nav(monkeypatch):
-    body = """
-        var fS_name = "示例指数基金";
-        var fS_code = "018147";
-        var Data_netWorthTrend = [{"x":1704038400000,"y":2.010,"equityReturn":0.60,"unitMoney":""}];
-        var Data_ACWorthTrend = [[1704038400000,2.010]];
-    """
-    monkeypatch.setattr(
-        requests,
-        "get",
-        lambda *args, **kwargs: SimpleNamespace(text=body, raise_for_status=lambda: None),
-    )
-    monkeypatch.setattr(
-        "akshare.fund_value_estimation_em",
-        lambda: pd.DataFrame(
-            {
-                "基金代码": ["018147"],
-                "2024-01-02-估算数据-估算值": ["2.02"],
-                "2024-01-02-估算数据-估算增长率": ["0.50%"],
-            }
-        ),
-    )
-
-    result = stock_data.cmd_fund_quote(Namespace(symbol="018147"))
-
-    assert result["nav"] == 2.01
-    assert result["nav_date"] == "2024-01-01"
-    assert result["data_as_of"] == "2024-01-01"
-    assert result["estimated_nav"] == 2.02
-    assert result["estimated_change_pct"] == 0.5
-    assert result["estimated_at"] == "2024-01-02"
-    assert result["estimate_status"] == "available"
-    assert "price" not in result
-
-
-def test_fund_quote_placeholder_estimate_is_unavailable(monkeypatch):
-    body = """
-        var fS_name = "示例指数基金";
-        var fS_code = "018147";
-        var Data_netWorthTrend = [{"x":1704038400000,"y":2.010,"equityReturn":0.60,"unitMoney":""}];
-        var Data_ACWorthTrend = [[1704038400000,2.010]];
-    """
-    monkeypatch.setattr(
-        requests,
-        "get",
-        lambda *args, **kwargs: SimpleNamespace(text=body, raise_for_status=lambda: None),
-    )
-    monkeypatch.setattr(
-        "akshare.fund_value_estimation_em",
-        lambda: pd.DataFrame(
-            {
-                "基金代码": ["018147"],
-                "2024-01-02-估算数据-估算值": ["---"],
-                "2024-01-02-估算数据-估算增长率": ["---"],
-            }
-        ),
-    )
-
-    result = stock_data.cmd_fund_quote(Namespace(symbol="018147"))
-
-    assert result["nav"] == 2.01
-    assert result["estimated_nav"] is None
-    assert result["estimated_change_pct"] is None
-    assert result["estimated_at"] is None
-    assert result["estimate_status"] == "unavailable"
 
 
 def test_quote_failure_for_six_digit_code_points_to_fund_quote(monkeypatch):

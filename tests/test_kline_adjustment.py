@@ -13,7 +13,7 @@ from tools.stock_data import _kline_tencent
 def isolate_sources(monkeypatch, tmp_path):
     monkeypatch.setattr(stock_data, "_DATA_CACHE_DIR", tmp_path)
     monkeypatch.setenv("TUSHARE_TOKEN", "test-token")
-    for name in ("akshare", "efinance", "tencent", "sina"):
+    for name in ("akshare", "efinance", "tencent", "sina", "baostock"):
         monkeypatch.setattr(stock_data, f"_kline_{name}", MagicMock(side_effect=ValueError("offline")))
 
 
