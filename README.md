@@ -9,7 +9,7 @@
 
 同一套 Python 工具同时支持 [Pi Agent](https://github.com/earendil-works/pi)、[Hermes Agent](https://github.com/NousResearch/hermes-agent)、[OpenClaw](https://github.com/openclaw/openclaw)、[DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness)，也能作为 MCP 服务器接入 Claude Desktop、Cursor、WorkBuddy。
 
-![dsh 股票仪表盘：六市场自选股行情、指数带、A 股涨跌分布与行业涨跌榜](https://raw.githubusercontent.com/Weaxs/stock-analysis-plugin/main/docs/images/dsh-dashboard-light.png)
+![dsh 股票仪表盘：六市场自选股行情、指数分时、A 股涨跌分布与 120 日指数图](https://raw.githubusercontent.com/leev313217559/stock-analysis-plugin/main/docs/images/dsh-dashboard-light.png)
 
 <sub>dsh Web / Desktop 中的「股票仪表盘」，真实行情截图。</sub>
 
@@ -69,7 +69,7 @@
 装了 dsh 插件的 Web / Desktop 会在侧栏出现「股票仪表盘」：
 
 - **自选股行情表**：最新价、涨跌幅、今日区间、成交额和 120 日走势，可排序、按市场筛选；最多 30 只，支持六个市场。
-- **市场概览**：顶部六市场指数带和 A 股涨跌分布；下方可切换市场查看指数，A 股另有涨跌统计和行业领涨、领跌榜。
+- **市场概览**：顶部六市场指数带（当日分时）和 A 股涨跌分布单行；下方按市场查看顶部指数的 120 日走势、成交量与交易时段，A 股为上证/深证成指/创业板三张独立图。
 - **打开即显示**：插件在后台常驻预热行情，页面只读内存快照；交易时段约 30 秒更新一次。
 - **与 Agent 共享**：Agent 可以用 `get_watchlist` 读取同一份自选股。
 
