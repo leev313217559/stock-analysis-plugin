@@ -176,9 +176,7 @@ def search_news(query: str, max_results: int = 10, budget_seconds: int = 45) -> 
         if engines_errors:
             note = "All configured search engines failed; see engines_errors for per-engine reasons."
         else:
-            note = (
-                "No search engines configured. Set TAVILY_API_KEY or SEARXNG_BASE_URLS in environment."
-            )
+            note = "No search engines configured. Set TAVILY_API_KEY or SEARXNG_BASE_URLS in environment."
         return {
             "query": query,
             "results": [],
