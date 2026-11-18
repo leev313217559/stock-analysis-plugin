@@ -17,6 +17,8 @@ A dsh-only stock analysis plugin: one Python CLI core, one dsh adapter, and a lo
 npm ci --ignore-scripts
 npm run build:dsh
 npx tsc --noEmit
+.venv/bin/python -m ruff check tools/ skills/ tests/
+.venv/bin/python -m ruff format --check tools/ skills/ tests/
 .venv/bin/python -m pytest -q
 npm run audit:keywords
 npm run export:keywords

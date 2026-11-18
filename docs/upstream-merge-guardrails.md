@@ -277,6 +277,8 @@ npx tsc --noEmit
 npm run build:dsh
 npm run audit:keywords
 npm run export:keywords
+.venv/bin/python -m ruff check tools/ skills/ tests/
+.venv/bin/python -m ruff format --check tools/ skills/ tests/
 .venv/bin/python -m pytest -q
 
 npx tsx tests/test_dsh_integration.ts
