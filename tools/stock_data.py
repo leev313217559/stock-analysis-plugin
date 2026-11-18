@@ -184,11 +184,6 @@ def _akshare_retry(fn, *args, retries=2, delay=1, **kwargs):
             time.sleep(delay)
 
 
-def _to_baostock_code(symbol: str) -> str:
-    code = _cn_code(symbol)
-    return f"{code[:2]}.{code[2:]}"
-
-
 def _kline_efinance(symbol: str, period: str, count: int) -> list:
     import efinance as ef
 
@@ -217,48 +212,6 @@ def _kline_efinance(symbol: str, period: str, count: int) -> list:
         for c in ["date", "open", "high", "low", "close", "volume", "turnover", "change_pct", "turnover_rate"]
         if c in df.columns
     ]
-    df = df[keep].tail(count)
-    return [_clean_row(r) for r in df.to_dict("records")]
-
-
-def _kline_baostock(symbol: str, period: str, count: int) -> list:
-    import io
-
-    import baostock as bs
-    import pandas as pd
-
-    freq_map = {"daily": "d", "weekly": "w", "monthly": "m"}
-    end = _cn_now()
-    start = end - timedelta(days=count * 7 if period == "weekly" else count * 31 if period == "monthly" else count * 2)
-    # baostock login/logout print status lines to stdout — silence them so the
-    # tool's JSON output on stdout stays clean for the calling host.
-    with contextlib.redirect_stdout(io.StringIO()):
-        bs.login()
-    try:
-        rs = bs.query_history_k_data_plus(
-            _to_baostock_code(symbol),
-            "date,open,high,low,close,volume,amount,pctChg",
-            start_date=start.strftime("%Y-%m-%d"),
-            end_date=end.strftime("%Y-%m-%d"),
-            frequency=freq_map.get(period, "d"),
-            adjustflag="2",
-        )
-        rows = []
-        while (rs.error_code == "0") and rs.next():
-            rows.append(rs.get_row_data())
-        df = pd.DataFrame(rows, columns=rs.fields)
-    finally:
-        with contextlib.redirect_stdout(io.StringIO()):
-            bs.logout()
-    if df.empty:
-        raise ValueError("baostock returned empty data")
-    col_map = {"amount": "turnover", "pctChg": "change_pct"}
-    df = df.rename(columns=col_map)
-    for c in ["open", "high", "low", "close", "volume"]:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-    df["volume"] /= 100  # Baostock uses shares; the A-share CLI contract uses lots.
-    keep = [c for c in ["date", "open", "high", "low", "close", "volume", "turnover", "change_pct"] if c in df.columns]
     df = df[keep].tail(count)
     return [_clean_row(r) for r in df.to_dict("records")]
 
@@ -564,14 +517,13 @@ def _clean_row(d: dict) -> dict:
 
 
 def kline_a(symbol: str, period: str, count: int, evidence: bool = False) -> list:
-    """A-share qfq kline: akshare → tushare → efinance → tencent → baostock.
+    """A-share qfq kline: akshare → tushare → efinance → tencent.
 
     Explicit indices keep raw points; unadjusted stock sources never enter the chain."""
     if _A_INDEX_RE.fullmatch(symbol):
         sources = [
             ("tencent", lambda: _kline_tencent(symbol, period, count)),
             ("sina", lambda: _kline_sina(symbol, period, count)),
-            ("baostock", lambda: _kline_baostock(symbol, period, count)),
         ]
     else:
         symbol = symbol[2:] if _A_PREFIXED_RE.fullmatch(symbol) else symbol
@@ -580,7 +532,6 @@ def kline_a(symbol: str, period: str, count: int, evidence: bool = False) -> lis
             ("tushare", lambda: _kline_tushare(symbol, period, count)),
             ("efinance", lambda: _kline_efinance(symbol, period, count)),
             ("tencent", lambda: _kline_tencent(symbol, period, count)),
-            ("baostock", lambda: _kline_baostock(symbol, period, count)),
         ]
     with socket_timeout(25):
         return _failover(sources, label=f"kline_a:{symbol}", evidence=evidence)
@@ -3686,7 +3637,6 @@ def cmd_margin_trading(args):
                             [
                                 ("akshare", lambda: _kline_akshare(bare, "daily", days + 10)),
                                 ("efinance", lambda: _kline_efinance(bare, "daily", days + 10)),
-                                ("baostock", lambda: _kline_baostock(bare, "daily", days + 10)),
                             ],
                             label=f"margin_turnover:{bare}",
                         )
@@ -3884,7 +3834,7 @@ def main():
         "margin_trading": cmd_margin_trading,
         "northbound_flow": cmd_northbound_flow,
     }
-    # Provider libraries (baostock etc.) print prose to stdout on failure,
+    # Provider libraries print prose to stdout on failure,
     # which would corrupt the JSON-only contract — divert that noise to stderr.
     with contextlib.redirect_stdout(sys.stderr):
         result = dispatch[args.command](args)

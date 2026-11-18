@@ -23,7 +23,6 @@ from tools.stock_data import (
     _fuzzy_match_sector,
     _kline_akshare,
     _kline_alphavantage,
-    _kline_baostock,
     _kline_finnhub,
     _kline_longbridge,
     _kline_sina,
@@ -50,7 +49,6 @@ from tools.stock_data import (
     _stock_boards_from_cache,
     _stock_boards_xueqiu,
     _stock_sectors_hk,
-    _to_baostock_code,
     _xq_symbol,
     _yf_hk_symbol,
     cmd_capital_flow,
@@ -96,16 +94,6 @@ def test_alphavantage_prices_use_adjusted_close(monkeypatch, period, key):
     )
     rows = _kline_alphavantage("AAPL", period, 2)
     assert [(r["open"], r["high"], r["low"], r["close"]) for r in rows] == [(100, 110, 90, 100)] * 2
-
-
-def test_baostock_volume_uses_a_share_lots(monkeypatch):
-    result = MagicMock(error_code="0", fields=["date", "open", "high", "low", "close", "volume", "amount", "pctChg"])
-    result.next.side_effect = [True, False]
-    result.get_row_data.return_value = ["2026-01-01", "10", "11", "9", "10", "10000", "100000", "0"]
-    monkeypatch.setattr("baostock.login", lambda: None)
-    monkeypatch.setattr("baostock.logout", lambda: None)
-    monkeypatch.setattr("baostock.query_history_k_data_plus", lambda *a, **kw: result)
-    assert _kline_baostock("600519", "daily", 1)[0]["volume"] == 100
 
 
 def test_alphavantage_large_window_requests_full_history(monkeypatch):
@@ -865,31 +853,6 @@ class TestQuoteTushare:
             _quote_tushare("600519")
 
 
-class TestToBaostockCode:
-    """Bare six-digit symbols are stocks; explicit exchange prefixes identify indices."""
-
-    def test_ambiguous_bare_codes_stay_shenzhen_stocks(self):
-        assert _to_baostock_code("000001") == "sz.000001"  # 平安银行, not 上证综指
-        assert _to_baostock_code("000016") == "sz.000016"  # 深康佳A, not 上证50
-
-    def test_explicit_shanghai_index_codes(self):
-        assert _to_baostock_code("sh000001") == "sh.000001"
-        assert _to_baostock_code("sh000300") == "sh.000300"
-
-    def test_shenzhen_index_codes(self):
-        assert _to_baostock_code("399001") == "sz.399001"  # 深证成指
-        assert _to_baostock_code("399006") == "sz.399006"  # 创业板指
-
-    def test_sz_stocks_not_hijacked_by_whitelist(self):
-        assert _to_baostock_code("000063") == "sz.000063"  # 中兴通讯 stays SZ
-        assert _to_baostock_code("000333") == "sz.000333"  # 美的集团 stays SZ
-
-    def test_stock_prefixes_unchanged(self):
-        assert _to_baostock_code("600519") == "sh.600519"
-        assert _to_baostock_code("510300") == "sh.510300"
-        assert _to_baostock_code("300750") == "sz.300750"
-
-
 class TestKlineLongbridge:
     @patch.dict(
         "os.environ",
@@ -999,20 +962,18 @@ class TestKlineAFailover:
             patch("tools.stock_data._kline_efinance") as mock_ef,
             patch("tools.stock_data._kline_tencent", return_value=[{"close": 1}]),
             patch("tools.stock_data._kline_sina"),
-            patch("tools.stock_data._kline_baostock"),
         ):
             assert kline_a("sh000001", "daily", 10) == [{"close": 1}]
         mock_ak.assert_not_called()
         mock_ts.assert_not_called()
         mock_ef.assert_not_called()
 
-    @patch("tools.stock_data._kline_baostock")
     @patch("tools.stock_data._kline_sina")
     @patch("tools.stock_data._kline_tencent")
     @patch("tools.stock_data._kline_efinance")
     @patch("tools.stock_data._kline_tushare")
     @patch("tools.stock_data._kline_akshare")
-    def test_akshare_success_others_not_called(self, mock_ak, mock_ts, mock_ef, mock_tx, mock_sina, mock_bs):
+    def test_akshare_success_others_not_called(self, mock_ak, mock_ts, mock_ef, mock_tx, mock_sina):
         mock_ak.return_value = [{"close": 100}]
         result = kline_a("600519", "daily", 10)
         assert result == [{"close": 100}]
@@ -1021,13 +982,12 @@ class TestKlineAFailover:
         mock_tx.assert_not_called()
         mock_sina.assert_not_called()
 
-    @patch("tools.stock_data._kline_baostock")
     @patch("tools.stock_data._kline_sina")
     @patch("tools.stock_data._kline_tencent")
     @patch("tools.stock_data._kline_efinance")
     @patch("tools.stock_data._kline_tushare")
     @patch("tools.stock_data._kline_akshare")
-    def test_falls_through_to_tencent(self, mock_ak, mock_ts, mock_ef, mock_tx, mock_sina, mock_bs):
+    def test_falls_through_to_tencent(self, mock_ak, mock_ts, mock_ef, mock_tx, mock_sina):
         """The issue #25 scenario: all eastmoney-flavored sources down, tencent saves the day."""
         mock_ak.side_effect = ValueError("down")
         mock_ts.side_effect = ValueError("down")
@@ -1037,39 +997,18 @@ class TestKlineAFailover:
         assert result == [{"close": 150}]
         mock_sina.assert_not_called()
 
-    @patch("tools.stock_data._kline_baostock")
     @patch("tools.stock_data._kline_sina")
     @patch("tools.stock_data._kline_tencent")
     @patch("tools.stock_data._kline_efinance")
     @patch("tools.stock_data._kline_tushare")
     @patch("tools.stock_data._kline_akshare")
-    def test_falls_through_to_baostock_skipping_raw_sources(
-        self, mock_ak, mock_ts, mock_ef, mock_tx, mock_sina, mock_bs
-    ):
-        mock_ak.side_effect = ValueError("down")
-        mock_ts.side_effect = ValueError("down")
-        mock_ef.side_effect = ValueError("down")
-        mock_tx.side_effect = ValueError("down")
-        mock_sina.side_effect = ValueError("down")
-        mock_bs.return_value = [{"close": 200}]
-        result = kline_a("600519", "daily", 10)
-        assert result == [{"close": 200}]
-        mock_sina.assert_not_called()
-
-    @patch("tools.stock_data._kline_baostock")
-    @patch("tools.stock_data._kline_sina")
-    @patch("tools.stock_data._kline_tencent")
-    @patch("tools.stock_data._kline_efinance")
-    @patch("tools.stock_data._kline_tushare")
-    @patch("tools.stock_data._kline_akshare")
-    def test_all_fail_raises_aggregated(self, mock_ak, mock_ts, mock_ef, mock_tx, mock_sina, mock_bs):
+    def test_all_fail_raises_aggregated(self, mock_ak, mock_ts, mock_ef, mock_tx, mock_sina):
         mock_ak.side_effect = ValueError("ak down")
         mock_ts.side_effect = ValueError("ts down")
         mock_ef.side_effect = ValueError("ef down")
         mock_tx.side_effect = ValueError("tx down")
         mock_sina.side_effect = ValueError("sina down")
-        mock_bs.side_effect = ValueError("bs down")
-        with pytest.raises(RuntimeError, match="bs down"):
+        with pytest.raises(RuntimeError):
             kline_a("600519", "daily", 10)
 
 
