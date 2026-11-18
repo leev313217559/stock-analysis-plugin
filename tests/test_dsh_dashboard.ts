@@ -560,13 +560,11 @@ try {
   assert.equal(pkg.dsh.client.platform, "web");
   assert(pkg.dsh.client.inject.includes("@deepseek-ai/dsh-client-ui-sidebar"));
   assert(pkg.dsh.client.inject.includes("@deepseek-ai/dsh-client-ui-layout"));
-  const publish = readFileSync(join(repoRoot, ".github", "workflows", "publish.yml"), "utf8");
-  assert(publish.includes("dist/client.js"), "unscoped publish must rewrite the browser module id too");
-  assert(publish.includes(`grep -q 'id: "dsh-stock-analysis"' dist/client.js`), "publish verifies the compiled (double-quoted) client id");
+  const release = readFileSync(join(repoRoot, ".github", "workflows", "custom-release.yml"), "utf8");
+  assert(release.includes("dsh/dist/client.js"), "custom release verifies the compiled browser module id");
+  assert(release.includes("Verify custom package identity"), "custom release checks the fork package identity");
   const clientSource = readFileSync(join(repoRoot, "dsh", "client.ts"), "utf8");
-  const unscopedClient = clientSource.replaceAll(pkg.name, "dsh-stock-analysis");
-  assert(unscopedClient.includes('id: "dsh-stock-analysis"'), "the unscoped bundle must register the unscoped client id");
-  assert(!unscopedClient.includes(`id: "${pkg.name}"`), "the scoped id must not remain after the twin rewrite");
+  assert(clientSource.includes(`id: "${pkg.name}"`), "the browser bundle registers the fork package id");
 
   // ---------- version/update hint ----------
   assert.equal(isNewerVersion("0.2.13", "0.2.12"), true);

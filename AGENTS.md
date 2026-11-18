@@ -81,6 +81,9 @@ Hard rules:
   Brave/Bocha/SerpAPI; adanos/Xueqiu stay key-gated).
 - Keep packaging dsh-only: root package private, only
   `@leev313217559/dsh-stock-analysis` published, custom `custom-v*` release.
+- Keep exactly three workflows: `ci.yml`, `canary.yml`, `custom-release.yml`.
+  `autofix.yml` and `publish.yml` were deliberately deleted; never restore them
+  or merge upstream workflow files wholesale.
 - Keep custom tests and fixtures. If upstream adds a tool, update
   `tests/fixtures/dsh-tool-names.json`, `tests/test_dsh_discovery.ts`,
   `scripts/export-tool-keywords.mjs`, `docs/tool-keywords.md`, README/AGENTS

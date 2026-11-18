@@ -33,7 +33,9 @@ If this file and an upstream README/AGENTS/doc disagree, this file and the
 6. **Only the dsh npm package is published.**
    Fork names are `@leev313217559/stock-analysis-plugin` (private root dev
    workspace) and `@leev313217559/dsh-stock-analysis` (published bundle).
-   Do not restore root/PyPI/OpenClaw publishing.
+   Do not restore root/PyPI/OpenClaw publishing. Only three workflows are
+   maintained: `ci.yml`, `canary.yml`, `custom-release.yml`;
+   `autofix.yml` and `publish.yml` are intentionally deleted.
 7. **Never merge upstream wholesale.**
    `git merge upstream/main` or a blind `git checkout --theirs` on `dsh/`,
    `tests/`, `README.md`, `AGENTS.md`, `package.json`, `pyproject.toml` or
@@ -72,7 +74,7 @@ understanding why a later upstream change may conflict.
 | Root package is a private dev workspace | `package.json`: `private: true`, no `main`/`pi`/`files`/`build:openclaw`, dsh-only scripts | Keep private and dsh-only; take only dependency/version facts from upstream. |
 | Python packaging is tools-only | `pyproject.toml`: no hatch build, no `hermes`/`mcp_host` packages, no PyPI entry points | Keep tools-only metadata. Do not restore `build-system`/Hermes entry points. |
 | dsh-only CI | `.github/workflows/ci.yml`: Python matrix + dsh/compat/e2e/build; no host matrix | Keep host jobs out. Preserve e2e secret-skip behavior. |
-| dsh-only release | `.github/workflows/publish.yml` publishes only `dsh/`; custom tarball release is `.github/workflows/custom-release.yml` | Do not restore PyPI/root npm/OpenClaw jobs. |
+| dsh-only CI/release | Only `.github/workflows/ci.yml`, `canary.yml` and `custom-release.yml` are allowed. `autofix.yml` and `publish.yml` were deliberately deleted (never used; publish conflicts with `custom-v*` release). | Never restore `autofix.yml` or `publish.yml`; do not take upstream workflow files wholesale. |
 | Fork documentation | `README.md`, `AGENTS.md`, `dsh/README.md`, `docs/source-profiles.md`, `docs/source-audit.md`, `docs/tool-keywords.md` are fork-oriented | Keep ours; port only factual upstream changes manually. |
 | Fork screenshots | `docs/images/dsh-dashboard-*.png` are the fork's screenshots | Do not overwrite with upstream old screenshots. |
 
@@ -135,7 +137,7 @@ understanding why a later upstream change may conflict.
 | Payload staging | `dsh/` gets `tools/`, `skills/`, `schemas/`, `templates/`, `strategies/`, `scripts/` copied (symlinks in dev; copies in release) | Preserve staging and verification; dsh package must include tools/scripts. |
 | dsh manifest | `dsh/package.json` `dsh.bundle.patch`, `files`, exports, peer deps | Keep fork name and payload list. |
 | Version sync | `scripts/sync-version.sh` updates pyproject + root + `dsh` only; `scripts/setup-python.mjs`/`venv-python.mjs` have no OpenClaw logic | Do not restore OpenClaw/PyPI version handling. |
-| Publish guards | `publish.yml` checks `dist/index.js`, patch files, web assets, LICENSE; unscoped variant rewrite uses actual package name | Preserve checks; adapt only paths if packaging changes. |
+| Release guards | `custom-release.yml` checks the fork package id, `dist/index.js`, patch files, web assets, LICENSE and the packed payload | Preserve checks; adapt only paths if packaging changes. |
 
 ### G. Tests, fixtures and docs to keep
 
@@ -234,7 +236,9 @@ temporary branch after merging.
 - **`README.md`, `AGENTS.md`, `dsh/README.md`, docs**: keep fork structure;
   take only factual upstream changes that are still true for dsh-only.
 - **`package.json`, `pyproject.toml`, `.github/workflows/`**: keep dsh-only
-  versions; port dependency versions only.
+  versions; port dependency versions only. Upstream re-adds `autofix.yml` and
+  `publish.yml`: keep them deleted. Only `ci.yml`, `canary.yml` and
+  `custom-release.yml` may exist.
 - **`dsh/package.json`, patch files, `scripts/sync-version.sh`**: keep fork
   package ids and payload rules.
 
@@ -293,6 +297,9 @@ npx tsx tests/e2e/test_dsh_e2e.ts
 Then verify the fork shape:
 
 ```bash
+# must print exactly ci.yml, canary.yml, custom-release.yml
+find .github/workflows -maxdepth 1 -type f -printf '%f\n' | sort
+
 # must print nothing
 ls pi openclaw hermes mcp_host 2>/dev/null || true
 test ! -e tools/tool_schemas.json

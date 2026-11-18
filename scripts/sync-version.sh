@@ -2,7 +2,7 @@
 # Sync all manifest version fields to the version derived from the current
 # git tag ($GITHUB_REF_NAME on GitHub Actions, e.g. "v0.1.5" → "0.1.5").
 #
-# Called by .github/workflows/publish.yml before each publish step. Changes
+# Called by .github/workflows/custom-release.yml before each release build. Changes
 # are in-CI only — never committed back to the repo.
 #
 # Manifests updated:
