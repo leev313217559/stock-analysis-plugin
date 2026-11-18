@@ -176,7 +176,7 @@ def test_searxng_instances_share_search_budget(monkeypatch):
     clock = [0.0]
     monkeypatch.setattr(search_intel._time, "monotonic", lambda: clock[0])
     monkeypatch.setenv("SEARXNG_BASE_URLS", "http://a,http://b,http://c,http://d")
-    for key in ("TAVILY_API_KEY", "BRAVE_API_KEY", "BOCHA_API_KEY", "SERPAPI_KEY"):
+    for key in ("TAVILY_API_KEY",):
         monkeypatch.delenv(key, raising=False)
     req = MagicMock()
 

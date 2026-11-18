@@ -1359,7 +1359,7 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
     pyTool({
       name: "search_stock_news",
       description:
-        "多引擎股票新闻搜索（Tavily/Brave/SerpAPI/Bocha/SearXNG）。需配置至少一个搜索源的 Key 或 SearXNG URL。get_news 快讯不够或要按主题搜索时用；深度6维情报用 search_comprehensive_intel",
+        "股票新闻搜索（Tavily / SearXNG）。需配置至少一个搜索源的 Key 或 SearXNG URL。get_news 快讯不够或要按主题搜索时用；深度6维情报用 search_comprehensive_intel",
       keywords: ["新闻搜索", "主题搜索", "关键词搜索", "Tavily", "news search", "web search", "最新消息", "资讯搜索", "全网新闻", "关键词新闻", "新闻检索", "资讯检索", "主题新闻"],
       parameters: {
         query: { type: "string", required: true, description: "搜索关键词" },
