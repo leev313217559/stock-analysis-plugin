@@ -8,6 +8,7 @@ import math
 import os
 import re
 import sys
+import threading
 import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -320,12 +321,16 @@ def _tencent_us_code(symbol: str) -> str:
     return "us" + symbol.upper().replace("-", ".")
 
 
-def _tencent_fields(code: str) -> list:
+def _tencent_raw(codes: str) -> bytes:
     import requests
 
-    resp = requests.get(f"https://qt.gtimg.cn/q={code}", timeout=10)
+    resp = requests.get(f"https://qt.gtimg.cn/q={codes}", timeout=10)
     resp.raise_for_status()
-    return _gbk_var_payload(resp.content).split("~")
+    return resp.content
+
+
+def _tencent_fields(code: str) -> list:
+    return _gbk_var_payload(_tencent_raw(code)).split("~")
 
 
 def _quote_tencent(symbol: str) -> dict:
@@ -582,17 +587,32 @@ def _kline_akshare(symbol: str, period: str, count: int) -> list:
     return [_clean_row(r) for r in df.to_dict("records")]
 
 
-def _kline_tushare(symbol: str, period: str, count: int) -> list:
-    """Tushare qfq kline via daily factors or the adjusted week/month endpoint."""
+def _tushare(api_name: str, params: dict, fields: str | None = None, error: str = "tushare returned no data"):
+    """POST one tushare HTTP API call; returns (fields, items) or raises with the API message."""
     import os
 
-    import pandas as pd
     import requests
 
     token = os.environ.get("TUSHARE_TOKEN")
     if not token:
         raise ValueError("TUSHARE_TOKEN not set")
+    body = {"api_name": api_name, "token": token, "params": params}
+    if fields:
+        body["fields"] = fields
+    data = requests.post("http://api.tushare.pro", json=body, timeout=15).json()
+    if data.get("code") != 0 or not data.get("data", {}).get("items"):
+        raise ValueError(f"{error}: {data.get('msg', '')}")
+    return data["data"]["fields"], data["data"]["items"]
 
+
+def _kline_tushare(symbol: str, period: str, count: int) -> list:
+    """Tushare qfq kline via daily factors or the adjusted week/month endpoint."""
+    import os
+
+    import pandas as pd
+
+    if not os.environ.get("TUSHARE_TOKEN"):
+        raise ValueError("TUSHARE_TOKEN not set")
     if normalize_stock_code(symbol)["is_etf"]:
         raise ValueError("tushare stock adjustment does not cover ETFs")
     end = _cn_now()
@@ -609,33 +629,17 @@ def _kline_tushare(symbol: str, period: str, count: int) -> list:
         params["freq"] = "week" if period == "weekly" else "month"
     fields = prices if period == "daily" else [f"{c}_qfq" for c in prices]
 
-    resp = requests.post(
-        "http://api.tushare.pro",
-        json={
-            "api_name": "daily" if period == "daily" else "stk_week_month_adj",
-            "token": token,
-            "params": params,
-            "fields": ",".join(["trade_date", *fields, "vol", "amount", "pct_chg"]),
-        },
-        timeout=15,
-    )
-    data = resp.json()
-    if data.get("code") != 0 or not data.get("data", {}).get("items"):
-        raise ValueError(f"tushare returned no data: {data.get('msg', '')}")
-
-    df = pd.DataFrame(data["data"]["items"], columns=data["data"]["fields"])
+    api = "daily" if period == "daily" else "stk_week_month_adj"
+    columns, items = _tushare(api, params, ",".join(["trade_date", *fields, "vol", "amount", "pct_chg"]))
+    df = pd.DataFrame(items, columns=columns)
     if not set(fields).issubset(df.columns):
         raise ValueError("tushare returned incomplete adjusted prices")
     df[fields] = df[fields].apply(pd.to_numeric, errors="coerce")
     if period == "daily":
-        factor_resp = requests.post(
-            "http://api.tushare.pro",
-            json={"api_name": "adj_factor", "token": token, "params": params, "fields": "trade_date,adj_factor"},
-            timeout=15,
-        ).json()
-        if factor_resp.get("code") != 0 or not factor_resp.get("data", {}).get("items"):
-            raise ValueError("tushare returned no adjustment factors")
-        factors = pd.DataFrame(factor_resp["data"]["items"], columns=factor_resp["data"]["fields"])
+        columns, items = _tushare(
+            "adj_factor", params, "trade_date,adj_factor", "tushare returned no adjustment factors"
+        )
+        factors = pd.DataFrame(items, columns=columns)
         factors["adj_factor"] = pd.to_numeric(factors["adj_factor"], errors="coerce")
         if not (factors["adj_factor"].gt(0) & factors["adj_factor"].lt(float("inf"))).all():
             raise ValueError("tushare returned invalid adjustment factors")
@@ -669,30 +673,10 @@ def _kline_tushare(symbol: str, period: str, count: int) -> list:
 
 def _quote_tushare(symbol: str) -> dict:
     """Tushare realtime quote via HTTP API."""
-    import os
-
-    import requests
-
-    token = os.environ.get("TUSHARE_TOKEN")
-    if not token:
-        raise ValueError("TUSHARE_TOKEN not set")
-
     ts_code = f"{symbol}.SH" if symbol.startswith(("6", "9", "5")) else f"{symbol}.SZ"
 
-    resp = requests.post(
-        "http://api.tushare.pro",
-        json={
-            "api_name": "realtime_quote",
-            "token": token,
-            "params": {"ts_code": ts_code},
-        },
-        timeout=15,
-    )
-    data = resp.json()
-    if data.get("code") != 0 or not data.get("data", {}).get("items"):
-        raise ValueError(f"tushare quote failed: {data.get('msg', '')}")
-
-    row = dict(zip(data["data"]["fields"], data["data"]["items"][0]))
+    columns, items = _tushare("realtime_quote", {"ts_code": ts_code}, error="tushare quote failed")
+    row = dict(zip(columns, items[0]))
     return _clean_row(
         {
             "symbol": symbol,
@@ -1004,15 +988,21 @@ def kline_yf(symbol: str, period: str, count: int, evidence: bool = False) -> li
 
 def cmd_kline(args):
     market = detect_market(args.symbol)
-    try:
+    # Round counts up so 30/60/80/120/250-bar callers share one fetch; the last intraday bar may be up to 60 s stale.
+    bucket = next((b for b in (60, 120, 250) if args.count <= b), args.count)
+
+    def fetch():
         if market == "A":
-            data = kline_a(args.symbol, args.period, args.count, evidence=True)
+            data = kline_a(args.symbol, args.period, bucket, evidence=True)
             if data:
                 adjusted = "none" if _A_INDEX_RE.fullmatch(args.symbol) else "qfq"
                 data = [dict(row, adjusted=adjusted) for row in data]
-        else:
-            data = kline_yf(args.symbol, args.period, args.count, evidence=True)
-        return data
+            return data
+        return kline_yf(args.symbol, args.period, bucket, evidence=True)
+
+    try:
+        data = cached(f"kline:v1:{args.symbol}:{args.period}:{bucket}", 60, fetch)
+        return data[-args.count :] if isinstance(data, list) else data
     except Exception as e:
         return {"error": error_message(e)}
 
@@ -1316,31 +1306,42 @@ QUOTES_DEADLINE = 30  # dsh/dashboard.ts allows the whole process 40 s
 QUOTES_MAX = 40
 
 
-def cmd_quotes(args):
-    """Several quotes in one process for the dsh dashboard; rows follow input order, a failure stays per row."""
-    import threading
-
-    symbols = [symbol.strip() for symbol in args.symbols.split(",") if symbol.strip()]
+def _batch(symbols_arg: str, one, label: str) -> list | dict:
+    """Run `one(symbol)` for several symbols in one process for the dsh dashboard; rows follow input order,
+    a failure or a row still running at the deadline stays per row."""
+    symbols = [symbol.strip() for symbol in symbols_arg.split(",") if symbol.strip()]
     if not 0 < len(symbols) <= QUOTES_MAX:
-        return {"error": f"quotes takes 1-{QUOTES_MAX} comma-separated symbols"}
-    rows = [{"error": "quote timed out"}] * len(symbols)
+        return {"error": f"{label}s takes 1-{QUOTES_MAX} comma-separated symbols"}
+    rows = [{"error": f"{label} timed out"}] * len(symbols)
     workers = threading.BoundedSemaphore(8)
 
-    def one(index, symbol):
+    def run(index, symbol):
         with workers:
             try:
-                rows[index] = cmd_quote(argparse.Namespace(symbol=symbol))
+                rows[index] = one(symbol)
             except Exception as e:
                 rows[index] = {"error": error_message(e)}
 
     # Daemon threads: a provider that hangs past the deadline cannot keep the process (and every other row) alive.
-    threads = [threading.Thread(target=one, args=item, daemon=True) for item in enumerate(symbols)]
+    threads = [threading.Thread(target=run, args=item, daemon=True) for item in enumerate(symbols)]
     for thread in threads:
         thread.start()
     deadline = time.monotonic() + QUOTES_DEADLINE
     for thread in threads:
         thread.join(max(0, deadline - time.monotonic()))
     return list(rows)
+
+
+def cmd_quotes(args):
+    return _batch(args.symbols, lambda symbol: cmd_quote(argparse.Namespace(symbol=symbol)), "quote")
+
+
+def cmd_klines(args):
+    return _batch(
+        args.symbols,
+        lambda symbol: cmd_kline(argparse.Namespace(symbol=symbol, period="daily", count=args.count)),
+        "kline",
+    )
 
 
 # --------------- open-end fund quote ---------------
@@ -1360,16 +1361,21 @@ def _fund_nav_date(stamp) -> str:
     return datetime.fromtimestamp(stamp / 1000, timezone.utc).astimezone(ZoneInfo("Asia/Shanghai")).date().isoformat()
 
 
+def fund_pingzhong_js(symbol: str) -> str:
+    """Eastmoney's per-fund JS bundle (NAV, scale, holdings series)."""
+    import requests
+
+    response = requests.get(f"https://fund.eastmoney.com/pingzhongdata/{symbol}.js", timeout=15)
+    response.raise_for_status()
+    return response.text
+
+
 def cmd_fund_quote(args):
     symbol = args.symbol
     if not re.fullmatch(r"\d{6}", symbol):
         return {"error": "open-end fund symbol must be exactly 6 digits"}
     try:
-        import requests
-
-        response = requests.get(f"https://fund.eastmoney.com/pingzhongdata/{symbol}.js", timeout=15)
-        response.raise_for_status()
-        text = response.text
+        text = fund_pingzhong_js(symbol)
         if _fund_js_value(text, "fS_code") != symbol:
             raise ValueError(f"eastmoney returned a different fund for {symbol}")
         name = _fund_js_value(text, "fS_name")
@@ -2097,6 +2103,45 @@ def _snapshot_clist(market: str, floor: float):
     return total, rows
 
 
+# Non-eastmoney HK/US leg: TradingView's public scanner, same columns as _CLIST_SNAPSHOT_COLUMNS.
+_TV_BASE = ["name", "description", "close", "change", "volume", "Value.Traded", "price_earnings_ttm"]
+_TV_SNAPSHOT_COLUMNS = {
+    "HK": ("hongkong", [*_TV_BASE, "price_book_fq", "market_cap_basic"]),
+    "US": ("america", [*_TV_BASE, "market_cap_basic"]),
+}
+_TV_KEYS = {"close": "price", "change": "change_pct", "Value.Traded": "turnover"}
+_TV_KEYS |= {"price_earnings_ttm": "pe", "price_book_fq": "pb", "market_cap_basic": "market_cap"}
+
+
+def _snapshot_tradingview(market: str, floor: float):
+    import requests
+
+    region, columns = _TV_SNAPSHOT_COLUMNS[market]
+    filters = [{"left": "type", "operation": "equal", "right": "stock"}]
+    filters += [{"left": "is_primary", "operation": "equal", "right": True}]
+    rows, total = [], None
+    while len(rows) < _SNAPSHOT_MAX_ROWS:
+        body = {"columns": columns, "filter": filters, "range": [len(rows), len(rows) + 1000]}
+        body["sort"] = {"sortBy": "market_cap_basic", "sortOrder": "desc"}
+        resp = requests.post(f"https://scanner.tradingview.com/{region}/scan", json=body, timeout=15)
+        resp.raise_for_status()
+        payload = resp.json()
+        total, data = payload.get("totalCount"), payload.get("data") or []
+        for item in data:
+            values = dict(zip(columns, item.get("d") or []))
+            cap = _parse_float(values.get("market_cap_basic"))
+            if cap is None or cap < floor:
+                return total, rows
+            row = {_TV_KEYS.get(col, col): _parse_float(values.get(col)) for col in columns[2:]}
+            row.update(symbol=_clist_symbol(market, values.get("name")), name=values.get("description"))
+            rows.append(_clean_row(row | {"pe_basis": "ttm"}))
+        if len(data) < 1000:
+            break
+    if not rows:
+        raise ValueError("tradingview scanner returned empty data")
+    return total, rows
+
+
 def normalize_us_symbol(value) -> str:
     symbol = str(value).strip().upper()
     symbol = re.sub(r"^(?:105|106|107)[.]", "", symbol)
@@ -2115,7 +2160,10 @@ def cmd_market_snapshot(args):
         if market == "A":
             legs = [("eastmoney", lambda: _snapshot_xuangu(filters)), ("tencent", lambda: _snapshot_tencent(filters))]
         elif market in _CLIST_SNAPSHOT_COLUMNS:
-            legs = [("eastmoney", lambda: _snapshot_clist(market, floor))]
+            legs = [
+                ("eastmoney", lambda: _snapshot_clist(market, floor)),
+                ("tradingview", lambda: _snapshot_tradingview(market, floor)),
+            ]
         else:
             return {"error": f"Unknown market: {market}"}
         with socket_timeout(25):
@@ -2143,11 +2191,7 @@ _REGION_INDEX_SYMBOLS = {
 def _quote_tencent_hk_index(symbol: str) -> dict:
     """Tencent r_hk index quote, using the same `~` field positions as _tencent_payload_row.
     Volume is omitted: the index feed's volume field has no confirmed unit."""
-    import requests
-
-    resp = requests.get(f"https://qt.gtimg.cn/q=r_{_TENCENT_HK_INDEX[symbol]}", timeout=10)
-    resp.raise_for_status()
-    f = _gbk_var_payload(resp.content).split("~")
+    f = _tencent_fields(f"r_{_TENCENT_HK_INDEX[symbol]}")
     price = _parse_float(f[3]) if len(f) > 34 else None
     if price is None or price <= 0:
         raise ValueError(f"tencent returned no quote for {symbol}")
@@ -2200,12 +2244,9 @@ def _cn_indices_eastmoney() -> dict:
 
 def _cn_indices_tencent() -> dict:
     """One qt.gtimg.cn batch request for every CN index (eastmoney refuses some datacenter IPs)."""
-    import requests
-
-    resp = requests.get(f"https://qt.gtimg.cn/q={','.join(code for code, _ in _CN_INDICES)}", timeout=10)
-    resp.raise_for_status()
+    content = _tencent_raw(",".join(code for code, _ in _CN_INDICES))
     quotes = {}
-    for part in resp.content.decode("gbk", errors="replace").split(";"):
+    for part in content.decode("gbk", errors="replace").split(";"):
         name, _, payload = part.strip().partition('="')
         fields = payload.rstrip('"').split("~")
         if len(fields) > 37 and _parse_float(fields[3]):
@@ -2789,8 +2830,7 @@ def _resolve_leg_down(name: str) -> bool:
 
 
 def resolve_stock_sectors(symbol: str, info_map=None) -> dict:
-    if info_map is not None:
-        return _resolve_stock_sectors(symbol, info_map)
+    # info_map only saves the em leg's fetch on a miss; the result is the same, so share the cache.
     return cached(f"stock-sectors:{symbol}", WEEK, lambda: _resolve_stock_sectors(symbol, info_map))
 
 
@@ -3633,6 +3673,10 @@ def main():
     p_quotes = sub.add_parser("quotes")
     p_quotes.add_argument("symbols", help=f"comma-separated, at most {QUOTES_MAX}")
 
+    p_klines = sub.add_parser("klines")
+    p_klines.add_argument("symbols", help=f"comma-separated, at most {QUOTES_MAX}; daily bars")
+    p_klines.add_argument("--count", type=int, default=30)
+
     p_fund_quote = sub.add_parser("fund_quote")
     p_fund_quote.add_argument("symbol")
 
@@ -3710,6 +3754,7 @@ def main():
         "kline": cmd_kline,
         "quote": cmd_quote,
         "quotes": cmd_quotes,
+        "klines": cmd_klines,
         "fund_quote": cmd_fund_quote,
         "capital_flow": cmd_capital_flow,
         "news": cmd_news,
@@ -3736,7 +3781,7 @@ def main():
     output(result)
     if isinstance(result, dict) and "error" in result:
         sys.exit(1)
-    if args.command == "quotes":
+    if args.command in ("quotes", "klines"):
         # Timed-out daemon threads may hold stderr; normal shutdown would then abort and drop valid rows.
         sys.stdout.flush()
         os._exit(0)

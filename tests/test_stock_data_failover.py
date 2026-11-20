@@ -1157,6 +1157,38 @@ class TestMarketSnapshot:
         assert rows[0]["symbol"] == symbol and rows[0]["pe_basis"] == "unknown"
         assert "turnover_rate" not in rows[0] and ("pb" in rows[0]) == (market == "HK")
 
+    @pytest.mark.parametrize(("market", "code", "symbol"), [("HK", "700", "00700.HK"), ("US", "BRK.B", "BRK-B")])
+    def test_tradingview_leg_matches_clist_columns(self, monkeypatch, market, code, symbol):
+        calls = []
+
+        def post(url, json, timeout):
+            calls.append((url, json))
+            values = {"name": code, "description": "x", "close": 10, "price_earnings_ttm": 12}
+            values |= {"price_book_fq": 2, "market_cap_basic": 6e9}
+            item = {"d": [values.get(col) for col in json["columns"]]}
+            small = {"d": [1e9 if col == "market_cap_basic" else values.get(col) for col in json["columns"]]}
+            data = [item] * 1000 if len(calls) == 1 else [item] * 5 + [small]
+            return MagicMock(json=lambda: {"totalCount": 4000, "data": data})
+
+        monkeypatch.setattr("requests.post", post)
+        from tools import stock_data
+
+        total, rows = stock_data._snapshot_tradingview(market, 5e9)
+        assert total == 4000 and len(rows) == 1005 and calls[1][1]["range"] == [1000, 2000]
+        assert calls[0][1]["sort"] == {"sortBy": "market_cap_basic", "sortOrder": "desc"}
+        assert rows[0]["symbol"] == symbol and rows[0]["market_cap"] == 6e9 and rows[0]["pe"] == 12
+        assert ("pb" in rows[0]) == (market == "HK")
+
+    def test_cli_falls_back_to_tradingview(self, monkeypatch):
+        from tools import stock_data
+
+        monkeypatch.setattr(stock_data, "_disk_cache_get", lambda key: None)
+        monkeypatch.setattr(stock_data, "_disk_cache_set", lambda key, value: None)
+        monkeypatch.setattr(stock_data, "_snapshot_clist", MagicMock(side_effect=ConnectionError("502")))
+        monkeypatch.setattr(stock_data, "_snapshot_tradingview", lambda market, floor: (7502, [{"symbol": "AAPL"}]))
+        result = stock_data.cmd_market_snapshot(Namespace(market="US", filters="{}"))
+        assert result["total_stocks"] == 7502 and result["rows"] == [{"symbol": "AAPL"}]
+
     def test_cli_falls_back_to_tencent_and_flags_truncation(self, monkeypatch):
         from tools import stock_data
 
@@ -1172,6 +1204,7 @@ class TestMarketSnapshot:
         from tools import stock_data
 
         monkeypatch.setattr(stock_data, "_snapshot_clist", MagicMock(side_effect=ConnectionError("reset by peer")))
+        monkeypatch.setattr(stock_data, "_snapshot_tradingview", MagicMock(side_effect=ConnectionError("blocked")))
         result = stock_data.cmd_market_snapshot(Namespace(market="US", filters="{}"))
         assert result["error"].startswith("US snapshot unavailable") and "reset by peer" in result["error"]
 
@@ -2119,9 +2152,23 @@ class TestResolveStockSectors:
         mock_em.reset_mock()
         mock_em.side_effect = ValueError("no industry")
         ts_before = _disk_cache_get("resolve-down-eastmoney")
-        result = resolve_stock_sectors("600519", info_map={"行业": float("nan")})
+        result = resolve_stock_sectors("000858", info_map={"行业": float("nan")})
         assert "error" in result
         assert _disk_cache_get("resolve-down-eastmoney") == ts_before  # not refreshed by an offline-data failure
+
+    @patch("tools.stock_data._stock_boards_from_cache", return_value=[])
+    @patch("tools.stock_data._stock_boards_cninfo", return_value=[])
+    @patch("tools.stock_data._stock_boards_xueqiu", return_value=[])
+    @patch("tools.stock_data._stock_boards_efinance", return_value=[])
+    @patch("tools.stock_data._stock_boards_em")
+    def test_info_map_call_uses_sector_cache(self, mock_em, mock_ef, _mock_xq, _mock_cn, _mock_cache):
+        """stock_info always passes info_map; the slow efinance leg must still be cached."""
+        mock_em.return_value = [{"name": "酿酒行业", "source": "eastmoney", "board_type": "industry"}]
+        first = resolve_stock_sectors("600519", info_map={"行业": "酿酒行业"})
+        second = resolve_stock_sectors("600519", info_map={"行业": "酿酒行业"})
+        assert first == second
+        assert mock_em.call_count == 1
+        assert mock_ef.call_count == 1
 
     @patch("tools.stock_data._stock_boards_from_cache", return_value=[])
     @patch("tools.stock_data._stock_boards_cninfo", return_value=[])
@@ -2760,7 +2807,7 @@ def test_hk_kline_falls_back_to_tencent_before_keyed_sources():
         patch("tools.stock_data._kline_finnhub") as fh,
     ):
         result = cmd_kline(Namespace(symbol="00700.HK", period="daily", count=1))
-    tx.assert_called_once_with("00700.HK", "daily", 1)
+    tx.assert_called_once_with("00700.HK", "daily", 60)
     fh.assert_not_called()
     assert (result[0]["source"], result[0]["adjusted"]) == ("tencent", "qfq")
 

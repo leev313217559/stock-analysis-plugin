@@ -61,6 +61,7 @@ If this file and an upstream README/AGENTS/doc disagree, this file and the
 | `98d2a9e`, `bba4ae7`, `ba73c4f` | Historical canary fixes (Shenzhen index fallback, unpriced breadth warning, fast snapshot); the fast-snapshot/index-fallback code was later superseded by upstream #91. |
 | `6f3f5a4` | Removed all non-dsh hosts, host tests/docs/workflows and shared schema indirection; made the repo and packaging dsh-only. |
 | `5a9bdea`, `cace5d3`, `3a1e84d`, `1427321`, `655ec48` | Ported upstream CDS, full-market-table removal, version hint, batch quotes; dropped legacy baostock again. These are fork integrations, not wholesale upstream merges. |
+| upstream #94–#97 | Batch klines by region (keeping our 120-bar count), dsh rc.4 dependency bump and trade-only tab dot, TradingView HK/US snapshot fallback, Python <3.12 test skip. Baostock and host-only parts were not taken. |
 
 The inventory below describes the **current** state; the chronology is for
 understanding why a later upstream change may conflict.
@@ -100,7 +101,7 @@ understanding why a later upstream change may conflict.
 | Dashboard layout | Flattened index section, compact session row, exact delay badge/tooltip, index tiles, A-share-only stats panel | Keep our `dsh/web/app.ts`, `style.css` and `index.html`; port only genuinely relevant upstream fixes manually. |
 | Credentials editor | Dashboard settings modal + `/api/config`; reads/writes `$DSH_HOME/stock-analysis.env`; atomic write, mode 600, mtime conflict check, same-origin guard | Preserve endpoints, security checks and config template. Do not accept upstream path-only config changes. |
 | Version/update hint | Footer shows installed package version; npm latest check is throttled; header pill opens the plugin page; fork GitHub URL | Was ported from upstream with fork adaptations. Keep the hint and fork URL; merge upstream logic only if it does not regress. |
-| Batch quotes | `dsh/dashboard.ts` coalesces due quotes into one `stock_data.py quotes` process; per-symbol slots/backoff remain | This is upstream #93 but already integrated with our UI. Keep the batch path; do not revert to per-symbol `quote` subprocesses. |
+| Batch quotes/klines | `dsh/dashboard.ts` coalesces due quotes into one `stock_data.py quotes` process and trends into one `klines` process per region (120-bar count); per-symbol slots/backoff remain | Upstream #93/#94, already integrated with our UI. Keep both batch paths and our 120-bar count; do not revert to per-symbol `quote`/`kline` subprocesses. |
 | Local-only security | Dashboard accepts only fixed routes/parameters; no arbitrary Python/script execution; same-origin checks | Do not add generic proxy/script endpoints while merging dashboard changes. |
 
 ### D. Python data layer, credentials and paths
@@ -179,8 +180,11 @@ reintroduce them just because an old branch/commit mentions them:
   restore full-market snapshots.
 - **Upstream #92 (CDS/asymmetric risk)**: accepted; `get_cds_index` is now an
   inline dsh tool (75th), with keywords/tests.
-- **Upstream #93 (batch dashboard quotes)**: accepted and integrated with our
-  dashboard; do not revert to per-symbol quote subprocesses.
+- **Upstream #93/#94 (batch quotes, klines and caches)**: accepted and
+  integrated with our dashboard; keep the 120-bar count. Do not revert to
+  per-symbol quote/kline subprocesses.
+- **Upstream #96 (TradingView HK/US fallback)**: accepted; keep the provider
+  helper refactor and source-profile behavior.
 
 ## 4. Upstream merge procedure
 

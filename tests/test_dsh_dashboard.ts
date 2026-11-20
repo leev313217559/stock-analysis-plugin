@@ -98,6 +98,11 @@ function fakePython(options: { phase?: string; fail?: (script: string, args: str
         ? { error: "secret stderr at /private/provider.py" }
         : { symbol, name: `Name ${symbol}`, price: 100, change_pct: 1.2, high: 101, low: 99 }));
     }
+    if (args[0] === "klines") {
+      return JSON.stringify(args[1].split(",").map(symbol => options.fail?.(script, ["kline", symbol])
+        ? { error: "secret stderr at /private/provider.py" }
+        : [{ date: "2026-01-01", close: 10, open: 9 }, { date: "2026-01-02", close: 11 }, { date: "2026-01-03", close: "bad" }]));
+    }
     if (script === "trading_calendar.py") return JSON.stringify({ market: args[1], phase: options.phase ?? "post_market", phase_label: "盘后" });
     if (script === "index_chart.py") return JSON.stringify({
       symbol: args[0], market: "A", currency: "CNY", volume_unit: "手", turnover_unit: "元",
@@ -119,9 +124,10 @@ function fakePython(options: { phase?: string; fail?: (script: string, args: str
   return { runPy, calls, timeouts, maxActive: () => maxActive };
 }
 
-/** How many batched quote processes asked for `symbol`. */
-function quoted(calls: string[], symbol: string): number {
-  return calls.filter(call => call.startsWith("stock_data.py:quotes ") && call.slice("stock_data.py:quotes ".length).split(",").includes(symbol)).length;
+/** How many batched `command` processes asked for `symbol`. */
+function quoted(calls: string[], symbol: string, command = "quotes"): number {
+  const prefix = `stock_data.py:${command} `;
+  return calls.filter(call => call.startsWith(prefix) && call.slice(prefix.length).split(" ")[0].split(",").includes(symbol)).length;
 }
 
 try {
@@ -287,7 +293,6 @@ try {
     assert.equal(py.timeouts.get(py.calls.find(call => call.startsWith("stock_data.py:quotes "))!), 40_000, "the batch outlives the CLI's own 30 s per-row deadline");
     for (const expected of [
       "stock_data.py:market_indices --region hk",
-      "stock_data.py:kline 600519 --period daily --count 120",
       "index_chart.py:^HSI --days 120",
       "stock_data.py:sector_rankings --top 5 --direction both --board-type industry",
       "stock_data.py:market_stats",
@@ -295,8 +300,10 @@ try {
     ]) assert(py.calls.includes(expected), `missing ${expected}`);
     assert(!py.calls.includes("stock_data.py:market_indices --region cn"), "A-share indices use direct quotes");
     assert.equal(py.timeouts.get("stock_data.py:market_stats"), 130_000);
-    assert.equal(py.timeouts.get("stock_data.py:kline 600519 --period daily --count 120"), 20_000);
-    assert.equal(py.timeouts.get("stock_data.py:kline AAPL --period daily --count 120"), 40_000, "Yahoo-backed klines get a longer budget");
+    const klines = py.calls.filter(call => call.startsWith("stock_data.py:klines "));
+    assert.equal(klines.length, 3, "one trend process per region");
+    for (const symbol of ["600519", "AAPL", "00700.HK"]) assert.equal(quoted(py.calls, symbol, "klines"), 1, `missing trend ${symbol}`);
+    assert(klines.every(call => call.endsWith(" --count 120") && py.timeouts.get(call) === 40_000), "trend batches keep the 120-day budget");
 
     const out = await call(handler, get("/stock-analysis/api/snapshot?region=hk&script=evil.py&argv=bad"));
     assert.equal(out.status(), 200);

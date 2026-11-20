@@ -558,6 +558,23 @@ def test_quotes_batch_keeps_input_order_and_isolates_failures(monkeypatch):
     assert result[1] == {"error": "provider down"}
 
 
+def test_klines_batch_passes_count_and_keeps_errors_per_row(monkeypatch):
+    from argparse import Namespace
+
+    from tools import stock_data
+
+    seen = []
+
+    def kline(args):
+        seen.append((args.symbol, args.period, args.count))
+        return {"error": "no data"} if args.symbol == "BAD" else [{"close": 1}]
+
+    monkeypatch.setattr(stock_data, "cmd_kline", kline)
+    result = stock_data.cmd_klines(Namespace(symbols="sh000001,BAD", count=30))
+    assert result == [[{"close": 1}], {"error": "no data"}]
+    assert sorted(seen) == [("BAD", "daily", 30), ("sh000001", "daily", 30)]
+
+
 def test_quotes_batch_rejects_oversized_input():
     from argparse import Namespace
 

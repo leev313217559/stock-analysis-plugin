@@ -198,7 +198,7 @@ jobs:
         run: npm ci
 
       - name: Install dsh CLI and package manager
-        run: npm i -g @deepseek-ai/dsh@0.2.2-rc.1 pnpm@10
+        run: npm i -g @deepseek-ai/dsh@0.2.2-rc.4 pnpm@10
 
       - name: dsh research presets and persistent runtime (offline)
         run: |

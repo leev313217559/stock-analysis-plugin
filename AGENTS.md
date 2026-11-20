@@ -72,7 +72,7 @@ Hard rules:
   inline `keywords`. Do not adopt upstream's shared schema indirection.
 - Keep the fork dashboard, not upstream's: A-share breadth only, no HK/US
   breadth or `#pulse`; 120-day watchlist/index charts + intraday/MA/volume/
-  OHLC; settings editor; version hint; batch quotes. Do not replace
+  OHLC; settings editor; version hint; batch quotes/klines. Do not replace
   `dsh/web/*` or `dsh/dashboard.ts` wholesale.
 - Keep Python paths/credentials: `$DSH_HOME/stock-analysis.env`,
   `$DSH_HOME/stock-analysis/`, `_credentials.py` loaded by every CLI,
