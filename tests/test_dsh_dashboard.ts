@@ -580,8 +580,94 @@ try {
   assert.equal(isNewerVersion("next", "0.2.12"), false);
   const installed = installedPlugin(join(repoRoot, "dsh"));
   assert(installed, "installedPlugin reads dsh/package.json");
-  assert.equal(installed.name, JSON.parse(readFileSync(join(repoRoot, "dsh", "package.json"), "utf8")).name);
+  assert.equal(installed.name, pkg.name);
   assert.equal(installed.latest, undefined, "source checkout does not query npm");
+
+  {
+    const versionFile = join(temp, "version", "watchlist.json");
+    writeWatchlist(versionFile, []);
+    const knownUpdates: Array<string | null> = [];
+    const plugin = {
+      name: pkg.name,
+      version: "0.2.11",
+      latest: async (knownUpdate: string | null) => {
+        knownUpdates.push(knownUpdate);
+        if (knownUpdates.length === 3) return null;
+        return knownUpdates.length < 3 ? "0.2.12" : "0.2.13";
+      },
+    };
+    const versioned = createDashboardHandler({ runPy: async () => "{}", watchlistFile: versionFile, webDir, plugin });
+    const snapshotVersion = async () => (await call(versioned, get("/stock-analysis/api/snapshot"))).json().plugin;
+    assert.deepEqual(await snapshotVersion(), { name: pkg.name, version: "0.2.11", latest: null });
+    assert.equal((await snapshotVersion()).latest, "0.2.12");
+    now += 60 * MINUTE - 1;
+    await snapshotVersion();
+    assert.equal(knownUpdates.length, 1, "reuse a successful check for one hour");
+    now++;
+    await Promise.all([snapshotVersion(), snapshotVersion()]);
+    assert.equal(knownUpdates.length, 2, "overlapping polls share the version check after expiry");
+    await call(versioned, post("/stock-analysis/api/refresh", {}));
+    assert.equal(knownUpdates.length, 3, "manual refresh checks even with a fresh cached result");
+    now += 29_999;
+    assert.equal((await snapshotVersion()).latest, "0.2.12", "keep the last result when the registry fails");
+    assert.equal(knownUpdates.length, 3, "wait 30 seconds before retrying");
+    now++;
+    await snapshotVersion();
+    assert.equal((await snapshotVersion()).latest, "0.2.13");
+    assert.deepEqual(knownUpdates, [null, "0.2.12", "0.2.12", "0.2.12"]);
+    versioned.dispose();
+    const unversioned = createDashboardHandler({ runPy: async () => "{}", watchlistFile: versionFile, webDir });
+    assert.equal((await call(unversioned, get("/stock-analysis/api/snapshot"))).json().plugin, null);
+    unversioned.dispose();
+    for (const name of [pkg.name, "dsh-stock-analysis"]) {
+      const installedDir = join(temp, "node_modules", name);
+      mkdirSync(join(installedDir, "dist"), { recursive: true });
+      writeFileSync(join(installedDir, "package.json"), JSON.stringify({ name, version: "0.2.11" }));
+      const found = installedPlugin(join(installedDir, "dist"));
+      assert.equal(found?.name, name);
+      assert.equal(typeof found?.latest, "function", `${name} registry installs check for updates`);
+    }
+    const realFetch = globalThis.fetch;
+    const configuredRegistry = process.env.npm_config_registry;
+    const registries: string[] = [];
+    try {
+      delete process.env.npm_config_registry;
+      let official = Response.json({ version: "unknown" });
+      let mirrorVersion = "0.2.13";
+      globalThis.fetch = async input => {
+        registries.push(String(input));
+        return new URL(String(input)).hostname === "registry.npmjs.org"
+          ? official.clone()
+          : Response.json({ version: mirrorVersion });
+      };
+      const testInstalled = installedPlugin(join(temp, "node_modules", pkg.name, "dist"));
+      assert(testInstalled?.latest);
+      const encoded = pkg.name.replace("/", "%2f");
+      assert.equal(await testInstalled.latest(null), "0.2.13");
+      assert.deepEqual(registries, [
+        `https://registry.npmjs.org/${encoded}/latest`,
+        `https://registry.npmmirror.com/${encoded}/latest`,
+      ]);
+      official = new Response(null, { status: 503 });
+      mirrorVersion = "0.2.11";
+      assert.equal(await testInstalled.latest(null), null, "a mirror at the installed version is inconclusive");
+      mirrorVersion = "0.2.12";
+      assert.equal(await testInstalled.latest("0.2.13"), null, "a lagging mirror cannot replace a known update");
+      mirrorVersion = "0.2.13";
+      assert.equal(await testInstalled.latest("0.2.13"), "0.2.13", "a mirror can confirm a known update");
+      official = Response.json({ version: "0.2.11" });
+      assert.equal(await testInstalled.latest("0.2.13"), "0.2.11", "the primary registry can roll back latest");
+      registries.length = 0;
+      process.env.npm_config_registry = "https://registry.example/";
+      assert.equal(await testInstalled.latest(null), "0.2.13");
+      assert.deepEqual(registries, [`https://registry.example/${encoded}/latest`]);
+    } finally {
+      globalThis.fetch = realFetch;
+      if (configuredRegistry === undefined) delete process.env.npm_config_registry;
+      else process.env.npm_config_registry = configuredRegistry;
+    }
+    assert.equal(installedPlugin(join(temp, "nothing")), undefined);
+  }
 
   console.log("dsh dashboard: snapshot, warmer freshness, failures, watchlist, security, assets, and package manifest passed");
 } finally {

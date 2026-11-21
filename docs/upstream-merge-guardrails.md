@@ -62,6 +62,7 @@ If this file and an upstream README/AGENTS/doc disagree, this file and the
 | `6f3f5a4` | Removed all non-dsh hosts, host tests/docs/workflows and shared schema indirection; made the repo and packaging dsh-only. |
 | `5a9bdea`, `cace5d3`, `3a1e84d`, `1427321`, `655ec48` | Ported upstream CDS, full-market-table removal, version hint, batch quotes; dropped legacy baostock again. These are fork integrations, not wholesale upstream merges. |
 | upstream #94–#97 | Batch klines by region (keeping our 120-bar count), dsh rc.4 dependency bump and trade-only tab dot, TradingView HK/US snapshot fallback, Python <3.12 test skip. Baostock and host-only parts were not taken. |
+| upstream #98–#100 | #98 fund/advisory watchlist: skipped (TIAA policy; fund NAV not needed). #99 UI polish: skipped; only the client effect/background cleanup was taken. #100 faster update checks: accepted (1 h cache, 30 s retry, npmmirror fallback). |
 
 The inventory below describes the **current** state; the chronology is for
 understanding why a later upstream change may conflict.
@@ -100,7 +101,7 @@ understanding why a later upstream change may conflict.
 | 120-day charts | Watchlist trend is 120 days; index cards use `index_chart.py --days 120` with intraday, MA5/MA20/MA60, volume, OHLC and hover details | Preserve `tools/index_chart.py`, `chartJob`, chart SVG code and 120-day commands. Do not let upstream's 30-day chart replace them. |
 | Dashboard layout | Flattened index section, compact session row, exact delay badge/tooltip, index tiles, A-share-only stats panel | Keep our `dsh/web/app.ts`, `style.css` and `index.html`; port only genuinely relevant upstream fixes manually. |
 | Credentials editor | Dashboard settings modal + `/api/config`; reads/writes `$DSH_HOME/stock-analysis.env`; atomic write, mode 600, mtime conflict check, same-origin guard | Preserve endpoints, security checks and config template. Do not accept upstream path-only config changes. |
-| Version/update hint | Footer shows installed package version; npm latest check is throttled; header pill opens the plugin page; fork GitHub URL | Was ported from upstream with fork adaptations. Keep the hint and fork URL; merge upstream logic only if it does not regress. |
+| Version/update hint | Footer shows installed package version; npm latest check caches success for 1 h, retries after 30 s, falls back to npmmirror; header pill opens the plugin page; fork GitHub URL | Was ported from upstream with fork adaptations (#90/#100). Keep the hint, retry/fallback and fork URL; merge upstream logic only if it does not regress. |
 | Batch quotes/klines | `dsh/dashboard.ts` coalesces due quotes into one `stock_data.py quotes` process and trends into one `klines` process per region (120-bar count); per-symbol slots/backoff remain | Upstream #93/#94, already integrated with our UI. Keep both batch paths and our 120-bar count; do not revert to per-symbol `quote`/`kline` subprocesses. |
 | Local-only security | Dashboard accepts only fixed routes/parameters; no arbitrary Python/script execution; same-origin checks | Do not add generic proxy/script endpoints while merging dashboard changes. |
 
@@ -185,6 +186,14 @@ reintroduce them just because an old branch/commit mentions them:
   per-symbol quote/kline subprocesses.
 - **Upstream #96 (TradingView HK/US fallback)**: accepted; keep the provider
   helper refactor and source-profile behavior.
+- **Upstream #98 (fund NAV/advisory watchlist)**: skipped. Fund NAV is not
+  needed, and the advisory portfolio/TIAA path violates the removed-provider
+  policy. Do not re-add it without an explicit product decision.
+- **Upstream #99 (dashboard UI polish)**: not merged. It reintroduces `#pulse`
+  and HK/US breadth and rewrites our layout. Only the client `ctx.effect`
+  cleanup/iframe background fix was taken.
+- **Upstream #100 (faster update checks)**: accepted; keep the 1 h success
+  cache, 30 s retry and npmmirror fallback.
 
 ## 4. Upstream merge procedure
 
