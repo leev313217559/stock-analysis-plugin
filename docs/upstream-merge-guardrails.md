@@ -39,7 +39,9 @@ If this file and an upstream README/AGENTS/doc disagree, this file and the
 7. **Never merge upstream wholesale.**
    `git merge upstream/main` or a blind `git checkout --theirs` on `dsh/`,
    `tests/`, `README.md`, `AGENTS.md`, `package.json`, `pyproject.toml` or
-   `.github/workflows/` will destroy fork work.
+   `.github/workflows/` will destroy fork work. The only exception is a
+   **tree-identical synthetic merge** used solely to record already-reviewed
+   commits as ancestors (see "Recorded skips: synthetic merge").
 8. **After every merge, the dsh-only shape must still be true.**
    Run the verification checklist in section 6 before pushing.
 
@@ -66,6 +68,33 @@ If this file and an upstream README/AGENTS/doc disagree, this file and the
 
 The inventory below describes the **current** state; the chronology is for
 understanding why a later upstream change may conflict.
+
+### Recorded skips: synthetic merge
+
+Upstream `#98` (fund NAV/advisory portfolios), `#99` (dashboard UI polish,
+section caching, undo) and `#100` (faster update checks) are intentionally not
+applied as commits. To stop GitHub showing the fork permanently "behind" and
+to advance the merge base, `custom`/`main` contain one **synthetic merge
+commit** whose tree is byte-identical to the preceding fork commit and whose
+second parent is `988404d`.
+
+Rules for this commit:
+
+- It imports **no** upstream files and changes **no** code. The tree before and
+  after the merge must be identical.
+- It is a history/merge-base marker, not permission to take #98/#99 wholesale.
+- #98 is still skipped (TIAA/advisory policy; fund NAV not needed).
+- #99 is still skipped except the client `ctx.effect`/iframe-background cleanup
+  that was ported manually.
+- #100's update-check logic was ported manually and is present in
+  `dsh/dashboard.ts`.
+- If these features are needed later, port them explicitly; do not "unskip"
+  the synthetic merge or use it to justify restoring skipped code.
+
+A future upstream merge should use `988404d` (or a newer upstream tip already
+recorded in this history) as the merge base. It must still resolve conflicts by
+the rules below; the synthetic merge only removes the misleading "behind 3"
+state and the need to revisit the same three commits.
 
 ### A. Host surface and repository shape
 
