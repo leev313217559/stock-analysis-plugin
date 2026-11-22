@@ -1231,6 +1231,19 @@ class TestMarketStats:
         assert next(p for u, p in fake.calls if "ZTPool" in u)["date"] == "20261117"
         assert len(fake.calls) == 7
 
+    def test_push2_blocked_keeps_breadth_and_falls_back_to_tencent_turnover(self, monkeypatch):
+        fenbu = {"data": {"qdate": 20261117, "fenbu": [{"11": 3}, {"2": 2}, {"0": 2}, {"-1": 9}, {"-11": 1}]}}
+        fake = FakeEastmoney(ZDFenBu=fenbu, ZTPool={"data": {"pool": []}}, DTPool={"data": {"pool": []}})
+        monkeypatch.setattr("tools.stock_data._get_json", fake)
+        monkeypatch.setattr("tools.stock_data._em_ulist", MagicMock(side_effect=ConnectionError("push2 blocked")))
+        monkeypatch.setattr("tools.stock_data._movers", MagicMock(side_effect=ConnectionError("push2 blocked")))
+        monkeypatch.setattr("tools.stock_data._a_turnover_tencent", lambda: 1.25e12)
+        stats = cmd_market_stats(Namespace(market="A"))
+        assert (stats["up_count"], stats["down_count"], stats["flat_count"], stats["total_stocks"]) == (5, 10, 2, 17)
+        assert stats["total_turnover"] == 1.25e12
+        assert stats["median_change_pct"] is None
+        assert stats["top5_gainers"] == [] and stats["top5_losers"] == []
+
     @pytest.mark.parametrize("market", ["HK", "US"])
     def test_hk_us_breadth_by_binary_search(self, monkeypatch, market):
         changes = [3.0] * 300 + [None] * 50 + [0.0] * 20 + [-2.0] * 630

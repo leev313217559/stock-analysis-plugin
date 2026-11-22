@@ -144,6 +144,7 @@ state and the need to revisit the same three commits.
 | Source profiles | `tools/sources.py`: `DATA_SOURCE_PROFILE=lean` default, `full` for upstream chains; `_yf_failover` applies profile; tests default to `full` | Preserve `LEAN`, `LABEL_CAPABILITIES`, `select`/`select_for_label` and the `_yf_failover` hook. Do not flatten chains. |
 | Provider policy | Removed: baostock, TIAA/youzhiyouxing, Brave/Bocha/SerpAPI search clients. Kept key-gated: adanos, Xueqiu, tushare, longbridge, finnhub, alphavantage, lixinger; baidu hot-stock backstop; efinance fund-flow backstop | Do not re-add removed providers while merging. Adanos stays key-gated; Xueqiu uses `XUEQIU_TOKEN`. |
 | akshare compatibility | `_ak_any` in `stock_data.py`, `index_hist_csindex`/`index_value_csindex` in `value_data.py`, renamed calendar/spot APIs; `tests/conftest.py` aliases old CSI names for Python 3.10; `tests/test_akshare_api_compat.py` guards | Keep shims and compat test. Upstream may use a single name; resolve both names. |
+| A-share market-stats degradation | `_market_stats_a` keeps breadth when push2 `ulist`/`clist` is blocked: turnover falls back to Tencent index totals (`sh000001`, `sz399106`, `bj899050`); movers/median/samples degrade to empty/null instead of failing the dashboard card | Preserve the partial-success behavior. Do not make an optional push2 enhancement fail the whole `market_stats` request. |
 | Removed legacy K-line fallback | `tools/stock_data.py` chain is akshare → tushare → efinance → tencent (no baostock); `tools/requirements.txt` has no baostock | Keep baostock out. The old canary/fast-snapshot workarounds were superseded by upstream #91; do not restore them. |
 | Contract fixtures | `tests/fixtures/contracts/` + `tests/test_output_contracts.py` assert normalized CLI shapes offline | Preserve fixtures/test; update deliberately only when a contract intentionally changes. |
 | Search/sentiment | `tools/search_intel.py`: Tavily + SearXNG; adanos X-API-Key endpoints; Xueqiu token-gated | Preserve provider set/routes; don't restore removed search clients. |
@@ -193,7 +194,9 @@ reintroduce them just because an old branch/commit mentions them:
 - **Fast efinance market-stats snapshot / Shenzhen index fallback** (commits
   `ba73c4f`, `98d2a9e`): superseded by upstream #91's server-side filtered
   stats and index queries. The canary now validates the current
-  `market_stats`/`index_chart` paths.
+  `market_stats`/`index_chart` paths. The later `_market_stats_a` partial
+  fallback (Tencent turnover + optional movers) is a separate robustness fix;
+  keep it, but do not reintroduce the old full-table snapshot path.
 - **Unpriced breadth rows as canary warning** (`bba4ae7`): keep the *policy*
   (warn, don't hard-fail), but the old breadth implementation is not current.
 - **Adanos removal**: it was removed then deliberately restored (`65c9285`).

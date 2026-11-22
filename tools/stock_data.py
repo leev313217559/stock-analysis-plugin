@@ -3115,20 +3115,67 @@ def _limit_samples(endpoint: str, sort: str, trade_date: str) -> list:
     ]
 
 
+def _a_turnover_tencent() -> float | None:
+    """A-share turnover fallback when push2's ulist host is unavailable.
+
+    Shanghai Composite and Shenzhen Composite turnover cover the whole A-share
+    market; Beijing 50 is included when available. A partial sum is better than
+    losing the breadth card, but all legs failing stays None.
+    """
+    total = 0.0
+    found = False
+    for symbol in ("sh000001", "sz399106", "bj899050"):
+        try:
+            value = _quote_tencent(symbol).get("turnover")
+        except Exception:
+            continue
+        if value is not None:
+            total += float(value)
+            found = True
+    return total if found else None
+
+
 def _market_stats_a() -> dict:
-    """A-share breadth from eastmoney's 涨跌分布 (buckets ±11 are limit moves) — no per-stock rows."""
+    """A-share breadth from eastmoney's 涨跌分布 (buckets ±11 are limit moves) — no per-stock rows.
+
+    The breadth endpoint and the push2 ranking/ulist hosts fail independently.
+    Keep the breadth card usable when push2 is blocked: turnover falls back to
+    Tencent index totals, while optional movers/median/samples degrade to
+    empty/null instead of failing the whole dashboard request.
+    """
     body = _get_json("https://push2ex.eastmoney.com/getTopicZDFenBu", _EM_LIMIT_POOL).get("data") or {}
     buckets = {int(k): int(v) for item in body.get("fenbu") or [] for k, v in item.items()}
     if not buckets:
         raise ValueError("eastmoney breadth distribution unavailable")
     up = sum(v for k, v in buckets.items() if k > 0)
-    down = sum(v for k, v in buckets.items() if k < 0)
+    down = sum(v for k, v in buckets.items() if v and k < 0)
     flat = buckets.get(0, 0)
     trade_date = str(body.get("qdate") or "")
-    index_rows = _em_ulist(["1.000001", "0.399001", "0.899050"], "f6")  # 沪 + 深 + 北 market turnover
-    turnovers = [_parse_float(r.get("f6")) for r in index_rows]
-    total, gainers = _movers("A", True)
-    _, losers = _movers("A", False)
+    try:
+        index_rows = _em_ulist(["1.000001", "0.399001", "0.899050"], "f6")  # 沪 + 深 + 北 market turnover
+        turnovers = [_parse_float(r.get("f6")) for r in index_rows]
+    except Exception:
+        turnovers = []
+    total_turnover = round(sum(turnovers), 0) if turnovers and None not in turnovers else _a_turnover_tencent()
+    total, gainers = 0, []
+    with contextlib.suppress(Exception):
+        total, gainers = _movers("A", True)
+    try:
+        _, losers = _movers("A", False)
+    except Exception:
+        losers = []
+    median = None
+    if total:
+        with contextlib.suppress(Exception):
+            median = _median_change("A", total, up, flat, up + down + flat)
+    try:
+        limit_up_samples = _limit_samples("getTopicZTPool", "fbt:asc", trade_date)
+    except Exception:
+        limit_up_samples = []
+    try:
+        limit_down_samples = _limit_samples("getTopicDTPool", "fund:asc", trade_date)
+    except Exception:
+        limit_down_samples = []
     return {
         "total_stocks": up + down + flat,
         "up_count": up,
@@ -3136,12 +3183,12 @@ def _market_stats_a() -> dict:
         "flat_count": flat,
         "limit_up_count": buckets.get(11, 0),
         "limit_down_count": buckets.get(-11, 0),
-        "median_change_pct": _median_change("A", total, up, flat, up + down + flat),
-        "total_turnover": round(sum(turnovers), 0) if turnovers and None not in turnovers else None,
+        "median_change_pct": median,
+        "total_turnover": total_turnover,
         "top5_gainers": gainers,
         "top5_losers": losers,
-        "limit_up_samples": _limit_samples("getTopicZTPool", "fbt:asc", trade_date),
-        "limit_down_samples": _limit_samples("getTopicDTPool", "fund:asc", trade_date),
+        "limit_up_samples": limit_up_samples,
+        "limit_down_samples": limit_down_samples,
     }
 
 
