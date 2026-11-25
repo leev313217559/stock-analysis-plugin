@@ -65,6 +65,7 @@ If this file and an upstream README/AGENTS/doc disagree, this file and the
 | `5a9bdea`, `cace5d3`, `3a1e84d`, `1427321`, `655ec48` | Ported upstream CDS, full-market-table removal, version hint, batch quotes; dropped legacy baostock again. These are fork integrations, not wholesale upstream merges. |
 | upstream #94–#97 | Batch klines by region (keeping our 120-bar count), dsh rc.4 dependency bump and trade-only tab dot, TradingView HK/US snapshot fallback, Python <3.12 test skip. Baostock and host-only parts were not taken. |
 | upstream #98–#100 | #98 fund/advisory watchlist: skipped (TIAA policy; fund NAV not needed). #99 UI polish: skipped; only the client effect/background cleanup was taken. #100 faster update checks: accepted (1 h cache, 30 s retry, npmmirror fallback). |
+| upstream #103–#107 | #103 HK market-data/Stock Connect recovery: accepted. #105 upstream AGENTS reorganization: skipped (multi-host and would overwrite our dsh-only AGENTS). #107 workflow lint/release preflight: skipped (depends on deleted upstream workflows/packaging). |
 
 The inventory below describes the **current** state; the chronology is for
 understanding why a later upstream change may conflict.
@@ -226,6 +227,12 @@ reintroduce them just because an old branch/commit mentions them:
   cleanup/iframe background fix was taken.
 - **Upstream #100 (faster update checks)**: accepted; keep the 1 h success
   cache, 30 s retry and npmmirror fallback.
+- **Upstream #103 (HK market data / Stock Connect)**: accepted; keep the
+  Tencent HK fallback, TradingView HK breadth and official Stock Connect lists.
+- **Upstream #105 (AGENTS rewrite)**: skipped. It is written for the four-host
+  upstream and would replace the dsh-only AGENTS/guardrails.
+- **Upstream #107 (workflow lint/preflight)**: skipped. It depends on the
+  deleted upstream `autofix.yml`/`publish.yml` and host packaging scripts.
 
 ## 4. Upstream merge procedure
 
