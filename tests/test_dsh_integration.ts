@@ -4,7 +4,7 @@
 // (defineTool is identity, so the options object is captured verbatim).
 // Verifies:
 //   - the plugin exports the cordis function-plugin form (name/inject/apply)
-//   - all 75 tools register, aligned with the dsh tool-name fixture
+//   - all 76 tools register, aligned with the dsh tool-name fixture
 //   - the dsh bundle manifest (package.json dsh.bundle.patch + cordis.patch.yml)
 //     is wired for the profile loader
 //   - every tool's execute() dispatches to a tools/*.py CLI (stubbed executor)
@@ -185,6 +185,7 @@ const sampleArgs: Record<string, Record<string, unknown>> = {
   get_valuation_history: { symbol: "600519" },
   get_index_valuation: { symbol: "000300" },
   get_cds_index: { source: "cn", days: 60, index: "民企", tenor: "1Y" },
+  get_macro_anchors: { group: "rates", days: 60 },
   get_earnings_calendar: { report_date: "2026-09-30", symbol: "600519" },
   get_shareholder_structure: { symbol: "600519", report_date: "2026-06-30" },
   get_etf_details: { symbol: "510300", benchmark: "sh000300" },

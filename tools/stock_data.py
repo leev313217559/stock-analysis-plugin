@@ -1400,28 +1400,8 @@ def cmd_klines(args):
 
 # --------------- open-end fund quote ---------------
 
-
-def _fund_js_value(text: str, name: str):
-    match = re.search(rf"\b{re.escape(name)}\s*=\s*", text)
-    if not match:
-        raise ValueError(f"eastmoney fund data missing {name}")
-    try:
-        return json.JSONDecoder().raw_decode(text[match.end() :])[0]
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"eastmoney fund data has invalid {name}") from exc
-
-
-def _fund_nav_date(stamp) -> str:
-    return datetime.fromtimestamp(stamp / 1000, timezone.utc).astimezone(ZoneInfo("Asia/Shanghai")).date().isoformat()
-
-
-def fund_pingzhong_js(symbol: str) -> str:
-    """Eastmoney's per-fund JS bundle (NAV, scale, holdings series)."""
-    import requests
-
-    response = requests.get(f"https://fund.eastmoney.com/pingzhongdata/{symbol}.js", timeout=15)
-    response.raise_for_status()
-    return response.text
+# Re-export the shared fund helpers; TIAA/advisory helpers are intentionally not imported.
+from _fund_data import _fund_js_value, _fund_nav_date, fund_pingzhong_js  # noqa: E402
 
 
 def cmd_fund_quote(args):
@@ -2607,6 +2587,100 @@ US_SECTOR_ETFS = {
 }
 
 
+HK_SECTOR_ETFS = {
+    "3033.HK": "Hang Seng TECH",
+    "2800.HK": "Broad Hong Kong (HSI)",
+    "2828.HK": "China Enterprises (HSCEI)",
+    "3110.HK": "High Dividend",
+    "3069.HK": "Biotech & Healthcare",
+    "3191.HK": "Semiconductors",
+    "2807.HK": "Robotics & AI",
+    "2809.HK": "Clean Energy",
+}
+
+
+def _sector_rankings_hk_tradingview() -> list:
+    """Aggregate HK market sectors from top HKEX equities via TradingView scanner."""
+    columns = ["name", "description", "sector", "change", "market_cap_basic", "Value.Traded"]
+    body = {
+        "columns": columns,
+        "filter": _TV_HK_STOCK_FILTERS,
+        "sort": {"sortBy": "market_cap_basic", "sortOrder": "desc"},
+        "range": [0, 500],
+    }
+    payload = _tradingview_scan("hongkong", body)
+    data = payload.get("data") or []
+    buckets: dict[str, dict] = {}
+    for item in data:
+        vals = dict(zip(columns, item.get("d") or []))
+        sector = vals.get("sector")
+        change = _parse_float(vals.get("change"))
+        cap = _parse_float(vals.get("market_cap_basic"))
+        turnover = _parse_float(vals.get("Value.Traded")) or 0.0
+        if not sector or change is None or not math.isfinite(change):
+            continue
+        weight = cap if (cap is not None and math.isfinite(cap) and cap > 0) else 1.0
+        b = buckets.setdefault(
+            str(sector),
+            {"weighted_sum": 0.0, "weight_total": 0.0, "count": 0, "up": 0, "down": 0, "turnover": 0.0, "leader": None},
+        )
+        b["weighted_sum"] += change * weight
+        b["weight_total"] += weight
+        b["count"] += 1
+        if change > 0:
+            b["up"] += 1
+        elif change < 0:
+            b["down"] += 1
+        b["turnover"] += turnover
+        stock_label = vals.get("description") or _clist_symbol("HK", vals.get("name"))
+        if b["leader"] is None or change > b["leader"][1]:
+            b["leader"] = (stock_label, change)
+    rows = []
+    for name, b in buckets.items():
+        if b["weight_total"] <= 0:
+            continue
+        row = {
+            "name": name,
+            "change_pct": round(b["weighted_sum"] / b["weight_total"], 4),
+            "stock_count": b["count"],
+            "up_count": b["up"],
+            "down_count": b["down"],
+            "turnover": round(b["turnover"], 2),
+        }
+        if b["leader"]:
+            row["leading_stock"] = b["leader"][0]
+            row["leading_change_pct"] = round(b["leader"][1], 4)
+        rows.append(row)
+    if not rows:
+        raise ValueError("TradingView HK sector aggregation returned empty data")
+    return rows
+
+
+def _sector_rankings_hk_etf() -> list:
+    """Fallback HK sector/theme proxies from HK-listed ETFs' last two daily closes."""
+    import yfinance as yf
+
+    closes = yf.download(list(HK_SECTOR_ETFS), period="10d", auto_adjust=False, progress=False)["Close"]
+    rows = []
+    for symbol, name in HK_SECTOR_ETFS.items():
+        series = closes[symbol].dropna() if symbol in closes else []
+        if len(series) < 2:
+            continue
+        rows.append(
+            {
+                "name": name,
+                "etf": symbol,
+                "close": round(float(series.iloc[-1]), 4),
+                "change_pct": round(float(series.iloc[-1] / series.iloc[-2] - 1) * 100, 4),
+                "as_of": str(series.index[-1])[:10],
+                "proxy": "HK Sector ETF",
+            }
+        )
+    if not rows:
+        raise ValueError("HK sector ETF quotes unavailable")
+    return rows
+
+
 def _sector_rankings_us() -> list:
     """S&P 500 sector proxies from the SPDR Select Sector ETFs' last two daily closes."""
     import yfinance as yf
@@ -2635,10 +2709,17 @@ def cmd_sector_rankings(args):
     board_type = getattr(args, "board_type", "industry")
     direction = getattr(args, "direction", "top")
     market = getattr(args, "market", "A")
-    if market == "US" and board_type != "industry":
-        return {"error": "US sector rankings support board_type=industry only"}
+    if market in ("US", "HK") and board_type != "industry":
+        return {"error": f"{market} sector rankings support board_type=industry only"}
     if market == "US":
         sources = [_sourced("yfinance", _sector_rankings_us)]
+        label = "sector_rankings_us:industry"
+    elif market == "HK":
+        sources = [
+            _sourced("tradingview", _sector_rankings_hk_tradingview),
+            _sourced("yfinance", _sector_rankings_hk_etf),
+        ]
+        label = "sector_rankings_hk:industry"
     else:
         sources = [_sourced("eastmoney", lambda: _sector_rankings_em(board_type))]
         if board_type == "industry":
@@ -2646,10 +2727,9 @@ def cmd_sector_rankings(args):
             sources += [_sourced("ths", _sector_rankings_ths), _sourced("efinance", _sector_rankings_efinance)]
         else:
             sources.append(_sourced("sina", lambda: _sector_rankings_sina("概念")))
+        label = f"sector_rankings:{board_type}"
     try:
-        rows = _failover(
-            sources, label="sector_rankings_us:industry" if market == "US" else f"sector_rankings:{board_type}"
-        )
+        rows = _failover(sources, label=label)
         if not rows:
             raise ValueError(f"no {board_type} board rankings data")
     except Exception as e:
@@ -2658,6 +2738,9 @@ def cmd_sector_rankings(args):
         r["board_type"] = board_type
         if market == "US":
             r.update(market="US", proxy="SPDR Select Sector ETF")
+        elif market == "HK":
+            r.setdefault("market", "HK")
+            r.setdefault("proxy", "TradingView HK Sector Aggregate")
 
     def _pct(row, default):
         v = row.get("change_pct")
@@ -3992,7 +4075,7 @@ def main():
     p_sec.add_argument("--top", type=int, default=10)
     p_sec.add_argument("--direction", default="top", choices=["top", "bottom", "both"])
     p_sec.add_argument("--board-type", default="industry", choices=["industry", "concept"])
-    p_sec.add_argument("--market", default="A", choices=["A", "US"])
+    p_sec.add_argument("--market", default="A", choices=["A", "HK", "US"])
 
     p_cons = sub.add_parser("sector_constituents")
     p_cons.add_argument("sector")

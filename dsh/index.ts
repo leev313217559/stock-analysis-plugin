@@ -288,6 +288,25 @@ export function apply(ctx: Context, config: {toolDiscovery?: boolean} = {}) {
 
   register(
     pyTool({
+      name: "get_macro_anchors",
+      description:
+        "查询跨市场宏观、利率、汇率与风险偏好基准（免Key，缓存1小时）：包含中美10年期国债收益率与美债2Y（及中美利差/美债10Y-2Y利差bp）、美元指数DXY、USD/CNH、USD/HKD、推导HKD/CNY，以及VIX、COMEX黄金与WTI原油。适用于DCF无风险利率锚、跨币种组合汇率参考与大盘复盘宏观背景",
+      keywords: ["宏观", "利率", "国债收益率", "美债", "中美利差", "美元指数", "DXY", "汇率", "USDCNH", "USDHKD", "HKDCNY", "VIX", "黄金", "原油", "macro", "risk free rate", "treasury yield", "gold", "crude oil"],
+      parameters: {
+        group: {
+          type: "string",
+          enum: ["all", "rates", "fx", "risk"],
+          description: "基准分组：all=全部（默认），rates=中美无风险利率，fx=汇率与美元指数，risk=VIX/黄金/原油",
+        },
+        days: { type: "integer", description: "历史统计窗口天数（2..365 整数，默认 30）" },
+      },
+      script: "macro_data.py",
+      argv: (p) => ["anchors", "--group", p.group ?? "all", "--days", String(p.days ?? 30)],
+    })
+  );
+
+  register(
+    pyTool({
       name: "get_cds_index",
       description:
         "查询市场级CDS指数作为信用风险偏好背景（非个股CDS或交易信号）。source=cn返回中国货币网CFETS-SHCH高等级/民企/长三角/科创/碳中和在岸CDS指数最新期限曲线（bp）与窗口内各期限变化（percentile为窗口内≤最新值的百分比0..100）；source=global取DTCC公开成交，按日汇总当前5Y系列CDX.NA.IG、iTraxx Europe/Crossover利差（bp）与CDX.NA.HY价格（价格下跌=信用走弱），只比较同一到期系列，是成交中位数而非官方收盘。用index/tenor只取需要的指数和期限，cn历史只为匹配到的指数分页拉取。",

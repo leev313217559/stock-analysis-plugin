@@ -53,13 +53,13 @@ removals), **Phase 3 done** (contract fixtures). Production defaults to
   path and adapter descriptions dropped, tests removed.
 - **adanos restored** (decision 2026-11-16): HK/US social sentiment and the
   `get_trending_sentiment` tool are back in the dsh adapter, and
-  `SENTIMENT_API_URL` / `SENTIMENT_API_KEY` are documented again (75 tools).
+  `SENTIMENT_API_URL` / `SENTIMENT_API_KEY` are documented again (76 tools).
 - **Search engines**: kept Tavily + SearXNG; Brave / Bocha / SerpAPI clients and
   their env vars were removed.
 - **Xueqiu kept and wired**: `_xueqiu_heat` reads `XUEQIU_TOKEN` (skips the request
   without it); industry fallback was already token-gated.
 - **Northbound** stays as a historical series with its existing disclosure note.
-- Verification: dsh-only test suite passes; the dsh adapter registers 75 tools.
+- Verification: dsh-only test suite passes; the dsh adapter registers 76 tools.
 
 ## Decisions (resolved)
 

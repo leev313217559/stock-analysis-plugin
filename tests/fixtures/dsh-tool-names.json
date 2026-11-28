@@ -37,6 +37,7 @@
   "get_insider_trades",
   "get_kline",
   "get_limit_up_pool",
+  "get_macro_anchors",
   "get_margin_trading",
   "get_market_capabilities",
   "get_market_indices",

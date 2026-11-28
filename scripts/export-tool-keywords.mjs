@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { readToolKeywords } from "./lib/tool-keywords.mjs";
 
 const rows = readToolKeywords();
-if (rows.length !== 75) throw new Error(`expected 75 tools, got ${rows.length}`);
+if (rows.length !== 76) throw new Error(`expected 76 tools, got ${rows.length}`);
 
 const lines = [
   "# 工具关键词清单（生成文件）",

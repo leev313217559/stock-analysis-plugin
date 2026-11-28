@@ -3,7 +3,7 @@
 > 此文件由 `node scripts/export-tool-keywords.mjs` 从 `dsh/index.ts` 生成，**不是源数据**。
 > 关键词的唯一维护点是每个工具定义中的 `keywords` 字段；不要直接编辑本文件。
 
-共 75 个工具。
+共 76 个工具。
 
 | 工具 | 关键词 |
 |---|---|
@@ -45,6 +45,7 @@
 | `get_insider_trades` | 内部人、高管交易、增减持、Form 4、insider trades、insider buying、持股变动、13D、13G、高管增持、内部人买卖 |
 | `get_kline` | K线、日K、周K、月K、历史价格、OHLCV、kline、candlestick、历史行情、蜡烛图、前复权、后复权、日线、周线、月线 |
 | `get_limit_up_pool` | 涨停、涨停池、连板、封板、炸板、涨停复盘、limit up、limit-up pool、涨停板、首板、二板、打板、封单、晋级、龙头、涨停原因、连板高度 |
+| `get_macro_anchors` | 宏观、利率、国债收益率、美债、中美利差、美元指数、DXY、汇率、USDCNH、USDHKD、HKDCNY、VIX、黄金、原油、macro、risk free rate、treasury yield、gold、crude oil |
 | `get_margin_trading` | 融资融券、两融、融资余额、融券余量、margin trading、securities lending、融资买入、融券卖出、杠杆资金、两融余额、融资净买入 |
 | `get_market_capabilities` | 市场能力、支持工具、市场边界、能不能用、capabilities、market support、工具支持、市场限制、能力查询、可用工具 |
 | `get_market_indices` | 指数、大盘、上证指数、深证成指、创业板指、恒生指数、纳斯达克、标普500、market indices、大盘指数、恒指、纳指、道指、日经、KOSPI、台股加权 |

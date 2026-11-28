@@ -5,7 +5,7 @@ A dsh-only stock analysis plugin: one Python CLI core, one dsh adapter, and a lo
 ## Architecture
 
 - `tools/*.py` — the single source of truth for stock data and calculations. Every tool prints JSON on stdout.
-- `dsh/index.ts` — dsh Cordis plugin. Registers 75 tools via `defineTool`; each tool carries inline `keywords` for discovery and dispatches to a `tools/*.py` CLI with argv, never a shell.
+- `dsh/index.ts` — dsh Cordis plugin. Registers 76 tools via `defineTool`; each tool carries inline `keywords` for discovery and dispatches to a `tools/*.py` CLI with argv, never a shell.
 - `dsh/discovery.ts` — on-demand `stock_tool_search`; core tools stay eager, aliases are derived from inline keywords.
 - `dsh/dashboard.ts` + `dsh/web/` — local-only dashboard server and browser UI.
 - `skills/*/SKILL.md` — 21 methodology/workflow skills registered by the dsh adapter.
@@ -68,7 +68,7 @@ Hard rules:
 - Keep the host surface dsh-only. Never reintroduce `pi/`, `openclaw/`,
   `hermes/`, `mcp_host/`, `typings/openclaw/`, `scripts/tool-calls.mjs`,
   `tools/tool_schemas.json`, or their tests/docs/workflows.
-- Keep tool definitions **inline** in `dsh/index.ts` (currently 75 tools) with
+- Keep tool definitions **inline** in `dsh/index.ts` (currently 76 tools) with
   inline `keywords`. Do not adopt upstream's shared schema indirection.
 - Keep the fork dashboard, not upstream's: A-share breadth only, no HK/US
   breadth or `#pulse`; 120-day watchlist/index charts + intraday/MA/volume/

@@ -18,7 +18,7 @@ If this file and an upstream README/AGENTS/doc disagree, this file and the
    Every model tool is an inline `defineTool(...)` / `pyTool(...)` block in
    `dsh/index.ts`, with its own `keywords`. Do not switch to upstream's shared
    `tool_schemas.json` + `tool-calls.mjs` indirection.
-3. **Current tool count is 75 and skills count is 21.**
+3. **Current tool count is 76 and skills count is 21.**
    The canonical names are in `tests/fixtures/dsh-tool-names.json`. The
    generated keyword inventory is `docs/tool-keywords.md`.
 4. **The dashboard is a fork-specific UI, not upstream's dashboard.**
@@ -66,6 +66,7 @@ If this file and an upstream README/AGENTS/doc disagree, this file and the
 | upstream #94–#97 | Batch klines by region (keeping our 120-bar count), dsh rc.4 dependency bump and trade-only tab dot, TradingView HK/US snapshot fallback, Python <3.12 test skip. Baostock and host-only parts were not taken. |
 | upstream #98–#100 | #98 fund/advisory watchlist: skipped (TIAA policy; fund NAV not needed). #99 UI polish: skipped; only the client effect/background cleanup was taken. #100 faster update checks: accepted (1 h cache, 30 s retry, npmmirror fallback). |
 | upstream #103–#107 | #103 HK market-data/Stock Connect recovery: accepted. #105 upstream AGENTS reorganization: skipped (multi-host and would overwrite our dsh-only AGENTS). #107 workflow lint/release preflight: skipped (depends on deleted upstream workflows/packaging). |
+| upstream #108 | Accepted core features: HK/US risk and sectors, macro anchors (new inline `get_macro_anchors`; tool count 76), portfolio/DCA backtest, signal/risk/SEC fixes. The dsh dashboard search API was kept; its upstream UI/layout changes were skipped to preserve our A-only/120-day dashboard. MCP/host adapter changes and TIAA fund helpers were not taken. |
 
 The inventory below describes the **current** state; the chronology is for
 understanding why a later upstream change may conflict.
@@ -114,11 +115,11 @@ state and the need to revisit the same three commits.
 
 | Customization | Current files / behavior | Merge rule |
 |---|---|---|
-| Inline tool definitions | `dsh/index.ts` has 75 inline tool blocks with `script`/`argv`, output renderers and `keywords`; no shared schema lookup | New upstream tools must be ported manually into inline blocks. Never replace `dsh/index.ts` with upstream's schema-driven adapter. |
+| Inline tool definitions | `dsh/index.ts` has 76 inline tool blocks with `script`/`argv`, output renderers and `keywords`; no shared schema lookup | New upstream tools must be ported manually into inline blocks. Never replace `dsh/index.ts` with upstream's schema-driven adapter. |
 | Inline keyword metadata | Each tool has `keywords`; discovery derives the alias index from them | Preserve keywords when porting a tool; update `docs/tool-keywords.md` via the export script. |
 | Eager core tools | `dsh/discovery.ts` `CORE_TOOLS`: `get_quote`, `get_kline`, `get_market_indices`, `get_market_stats`, `get_technical_analysis`, `get_news` stay visible without search | Do not merge upstream's discovery wholesale; keep core-eager behavior. |
 | Chinese-normalized discovery | `stock_tool_search` normalizes Chinese functional terms, keeps finance abbreviations/codes, uses weighted terms, bigrams and an alias table | Preserve. Upstream's simpler scoring/description must not overwrite it. |
-| Tool count is coupled | `dsh/index.ts` (75) + `tests/fixtures/dsh-tool-names.json` (75) + `tests/test_dsh_discovery.ts` (75) + `scripts/export-tool-keywords.mjs` hardcoded 75 + README/AGENTS/dsh README counts | When upstream adds/removes a tool, update **all** of these in the same change. |
+| Tool count is coupled | `dsh/index.ts` (76) + `tests/fixtures/dsh-tool-names.json` (76) + `tests/test_dsh_discovery.ts` (76) + `scripts/export-tool-keywords.mjs` hardcoded 76 + README/AGENTS/dsh README counts | When upstream adds/removes a tool, update **all** of these in the same change. |
 | Tool names without host manifest | `tests/fixtures/dsh-tool-names.json` replaces upstream's use of `openclaw/openclaw.plugin.json` | Keep the fixture; do not restore manifest reads in dsh tests. |
 | Keyword tooling | `scripts/audit-tool-keywords.mjs`, `scripts/export-tool-keywords.mjs`, `scripts/lib/tool-keywords.mjs`, `docs/tool-keywords.md`, `tests/fixtures/tool-search-cases.json` | Keep; port data changes only. `export` must fail if the count/parser is wrong, not silently truncate. |
 | dsh research presets | `dsh/research-role.ts`, `dsh/research.patch.yml`, `dsh/deepseek-search.patch.yml`; package ids use the fork package name | Preserve fork package ids in patch files. |
@@ -176,7 +177,7 @@ state and the need to revisit the same three commits.
 
 These are fork-specific and must not be dropped when taking upstream test changes:
 
-- `tests/fixtures/dsh-tool-names.json` (75 names)
+- `tests/fixtures/dsh-tool-names.json` (76 names)
 - `tests/fixtures/tool-search-cases.json`
 - `tests/fixtures/contracts/` + `tests/test_output_contracts.py`
 - `tests/test_akshare_api_compat.py`
@@ -213,7 +214,7 @@ reintroduce them just because an old branch/commit mentions them:
 - **Upstream #91 (full-market table removal)**: accepted core refactor; do not
   restore full-market snapshots.
 - **Upstream #92 (CDS/asymmetric risk)**: accepted; `get_cds_index` is now an
-  inline dsh tool (75th), with keywords/tests.
+  inline dsh tool (75th), with keywords/tests. `get_macro_anchors` is the 76th.
 - **Upstream #93/#94 (batch quotes, klines and caches)**: accepted and
   integrated with our dashboard; keep the 120-bar count. Do not revert to
   per-symbol quote/kline subprocesses.
@@ -233,6 +234,10 @@ reintroduce them just because an old branch/commit mentions them:
   upstream and would replace the dsh-only AGENTS/guardrails.
 - **Upstream #107 (workflow lint/preflight)**: skipped. It depends on the
   deleted upstream `autofix.yml`/`publish.yml` and host packaging scripts.
+- **Upstream #108 (macro/risk/portfolio + dsh UX)**: core data, risk, macro,
+  portfolio/DCA backtest and the new `get_macro_anchors` tool were accepted.
+  The dsh search API was kept, but the upstream dashboard UI/layout was not
+  merged. MCP/host adapters and TIAA advisory helpers were skipped.
 
 ## 4. Upstream merge procedure
 
@@ -314,7 +319,7 @@ temporary branch after merging.
 5. If needed, add `tools/capabilities.py` matrix entry and `get_cds_index`-style
    market support.
 6. Update:
-   - `tests/test_dsh_discovery.ts` (`75` → new count)
+   - `tests/test_dsh_discovery.ts` (`76` → new count)
    - `scripts/export-tool-keywords.mjs` hardcoded expected count
    - `README.md`, `AGENTS.md`, `dsh/README.md` counts
 7. Run `npm run export:keywords` and `npm run audit:keywords`.
